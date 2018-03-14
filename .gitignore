@@ -1,0 +1,6 @@
+*.zip
+*.pyc
+.idea/*
+curvytron-master/*
+curvytron-step-by-step/*
+*.pcapng
