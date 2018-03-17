@@ -1,5 +1,13 @@
 # curvytron-client
 
+## Install
+
+```bash
+conda create -n cc python=3 spyder
+conda activate cc
+pip install websockets-client
+```
+
 Connect to curvytronserver from Python using WebSocket.
 Intended to be used as part of an environment for RL.
 
