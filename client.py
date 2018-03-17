@@ -5,7 +5,6 @@ from collections import defaultdict
 
 websocket.enableTrace(False)
 
-
 class CurvytronClient(threading.Thread):
 
     FETCH_ROOMS = '[["room:fetch"]]'
@@ -97,13 +96,13 @@ class CurvytronClient(threading.Thread):
 
     def _parse_message(self, message):
         if self.verbose:
-            print "parsing message: ", message
+            print("parsing message: ", message)
 
         if message[0] == 'position':
             pos = (message[1][1], message[1][2])
             if self.game['players'][message[1][0]]['printing']:
                 if self.verbose:
-                    print "____ADDING TRAIL"
+                    print("____ADDING TRAIL")
                 self.game['trails'][message[1][0]].append(pos)
             self.game['players'][message[1][0]]['position'] = pos
 
