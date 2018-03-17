@@ -17,7 +17,10 @@ Client is now "minimally working". It can connect to a server, join a room and p
 To see the client storing the positions of the players, run the following in an interactive session, replacing "server_address" with the actual address of your curvytron server (e.g. 127.0.0.1:8080):
 
 ```python
-pyclient = client.CurvytronClient(server='server_address')
+import client
+server_address = '192.168.0.1:8080'
+#server_address = 'www.curvytron.com'
+pyclient = client.CurvytronClient(server=server_address)
 pyclient.start()
 pyclient.join_room('room')
 ```
