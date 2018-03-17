@@ -6,7 +6,20 @@ from collections import defaultdict
 websocket.enableTrace(False)
 
 class CurvytronClient(threading.Thread):
-
+    BONUS_NAMES = [
+        'BonusSelfSmall',
+        'BonusSelfSlow',
+        'BonusSelfFast',
+        'BonusSelfMaster',
+        'BonusEnemySlow',
+        'BonusEnemyFast',
+        'BonusEnemyBig',
+        'BonusEnemyInverse',
+        'BonusEnemyStraightAngle',
+        'BonusGameBorderless',
+        'BonusAllColor',
+        'BonusGameClear'
+    ]
     FETCH_ROOMS = '[["room:fetch"]]'
     WHOAMI = '[["whoami",null,0]]'
     MAKE_ROOM = '[["room:create",{{"name":"{room_name}"}},{msg_id}]]'
@@ -15,7 +28,8 @@ class CurvytronClient(threading.Thread):
     ADD_PLAYER = '[["player:add",{{"name":"{player_name}","color":"{player_color}"}},{msg_id}]]'
     READY = '[["ready"]]'
     PLAYER_READY = '[["room:ready", {{"player": {player_id}}}, {msg_id}]]'
-
+    BONUS_CHANGE_ROOM = '[["room:config:bonus",{{"bonus":"{bonus_name}","enabled":{enabled}}}, {msg_id}]]'
+    
     def __init__(self, server, name='pythonClient', color="#ffffff", verbose=False):
         super(CurvytronClient, self).__init__()
 
@@ -54,7 +68,37 @@ class CurvytronClient(threading.Thread):
         self.ws.close()
         super(CurvytronClient, self).join(timeout)
 
-    def join_room(self, target_room):
+    def create_room(self, target_room=None):
+        """Create room called target_room with bonuses listed in bonuses
+        """
+        for room in self.server.get('rooms', []):
+            assert room['name'] != target_room, "Room already exists"
+        self._send_message(self.MAKE_ROOM, {'room_name': target_room})
+        self._wait_for_reply(self.message_id)
+        assert(self.message_responses[self.message_id]['success'])
+        
+    def set_bonuses(self, target_room=None, on_bonuses=None):
+        BONUS_NAMES = self.BONUS_NAMES
+        if on_bonuses is None:
+            off_bonuses = BONUS_NAMES
+            for bonus_name in off_bonuses:
+                self._send_message(self.BONUS_CHANGE_ROOM, 
+                                   {'bonus_name': bonus_name,
+                                    'enabled': 'false'})
+        else:
+            invalid_bonus_names = [bb for bb in on_bonuses 
+                                   if bb not in BONUS_NAMES]
+            assert len(invalid_bonus_names) == 0,\
+                "{} are not in valid bonus names ({})".format(
+                        invalid_bonus_names, BONUS_NAMES)
+            off_bonuses = [bb for bb in BONUS_NAMES if bb not in on_bonuses]
+            for bonus_name in off_bonuses:
+                self._send_message(self.BONUS_CHANGE_ROOM, 
+                                   {'bonus_name': bonus_name,
+                                    'enabled': 'false'})
+        # TODO: Much later, low priority, implement presets such as fatty?!
+        
+    def join_room(self, target_room, on_bonuses=None):
         """Doc string
         If the provided room exists, join it.
         Otherwise, create and configure the room,
@@ -67,12 +111,8 @@ class CurvytronClient(threading.Thread):
             if room['name'] == target_room:
                 break
         else:
-            # create room
-            self._send_message(self.MAKE_ROOM, {'room_name': target_room})
-            self._wait_for_reply(self.message_id)
-            assert(self.message_responses[self.message_id]['success'])
-            # TODO: Turn off bonuses
-
+            self.create_room(target_room)
+        
         # join room
         self._send_message(self.JOIN_ROOM, {'room_name': target_room})
         self._wait_for_reply(self.message_id)
@@ -80,6 +120,7 @@ class CurvytronClient(threading.Thread):
         self._send_message(self.ADD_PLAYER)
         self._wait_for_reply(self.message_id)
         assert (self.message_responses[self.message_id]['success'])
+        self.set_bonuses(target_room=target_room, on_bonuses=on_bonuses)
 
     def send_action(self, action):
         self._send_message(self.PLAYER_MOVE, {'action': action})
