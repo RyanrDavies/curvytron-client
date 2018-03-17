@@ -20,8 +20,15 @@ class CurvytronClient(threading.Thread):
         'BonusAllColor',
         'BonusGameClear'
     ]
+    BONUS_PRESETS = {'all': BONUS_NAMES,
+                     'speed': ['BonusSelfFast', 'BonusEnemyFast'],
+                     'supersize': ['BonusEnemyBig'],
+                     'solo': ['BonusSelfSmall', 'BonusSelfSlow', 'BonusSelfFast', 'BonusSelfMaster',
+                              'BonusGameBorderless', 'BonusGameClear'],
+                     'none': None
+                     }
     FETCH_ROOMS = '[["room:fetch"]]'
-    WHOAMI = '[["whoami",null,0]]'
+    WHOAMI = '[["whoami",null,{msg_id}]]'
     MAKE_ROOM = '[["room:create",{{"name":"{room_name}"}},{msg_id}]]'
     PLAYER_MOVE = '[["player:move",{{"avatar":{player_id},"move":{action}}}]]'
     JOIN_ROOM = '[["room:join",{{"name":"{room_name}","password":null}},{msg_id}]]'
@@ -77,8 +84,12 @@ class CurvytronClient(threading.Thread):
         self._wait_for_reply(self.message_id)
         assert(self.message_responses[self.message_id]['success'])
         
-    def set_bonuses(self, target_room=None, on_bonuses=None):
+    def set_bonuses(self, on_bonuses=None):
         BONUS_NAMES = self.BONUS_NAMES
+
+        if on_bonuses in self.BONUS_PRESETS:
+            on_bonuses = self.BONUS_PRESETS[on_bonuses]
+
         if on_bonuses is None:
             off_bonuses = BONUS_NAMES
             for bonus_name in off_bonuses:
@@ -96,7 +107,6 @@ class CurvytronClient(threading.Thread):
                 self._send_message(self.BONUS_CHANGE_ROOM, 
                                    {'bonus_name': bonus_name,
                                     'enabled': 'false'})
-        # TODO: Much later, low priority, implement presets such as fatty?!
         
     def join_room(self, target_room, on_bonuses=None):
         """Doc string
@@ -123,7 +133,7 @@ class CurvytronClient(threading.Thread):
         self._send_message(self.ADD_PLAYER)
         self._wait_for_reply(self.message_id)
         assert (self.message_responses[self.message_id]['success'])
-        self.set_bonuses(target_room=target_room, on_bonuses=on_bonuses)
+        self.set_bonuses(on_bonuses=on_bonuses)
 
     def send_action(self, action):
         self._send_message(self.PLAYER_MOVE, {'action': action})
