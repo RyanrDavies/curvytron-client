@@ -1,6 +1,7 @@
 import websocket
 import json
 import threading
+from collections import defaultdict
 
 websocket.enableTrace(False)
 
@@ -13,8 +14,10 @@ class CurvytronClient(threading.Thread):
     PLAYER_MOVE = '[["player:move",{{"avatar":{player_id},"move":{action}}}]]'
     JOIN_ROOM = '[["room:join",{{"name":"{room_name}","password":null}},{msg_id}]]'
     ADD_PLAYER = '[["player:add",{{"name":"{player_name}","color":"{player_color}"}},{msg_id}]]'
+    READY = '[["ready"]]'
+    PLAYER_READY = '[["room:ready", {{"player": {player_id}}}, {msg_id}]]'
 
-    def __init__(self, server, name='pythonClient', color="#ffffff"):
+    def __init__(self, server, name='pythonClient', color="#ffffff", verbose=False):
         super(CurvytronClient, self).__init__()
 
         self.message_id = -1
@@ -22,19 +25,21 @@ class CurvytronClient(threading.Thread):
         self.ws = websocket.WebSocket()
         self.alive = threading.Event()
         self.alive.set()
+        self.verbose = verbose
 
         self.name = name
         self.color = color
         self.game_state = None
         self.active_game = False
         self.server = {'address': server, 'rooms': []}
-        self.game = {'players': {}}
+        self.game = {'players': {}, 'trails': defaultdict(list)}
         self.message_responses = {}
+        self.player_alive = True
+        self.round_score = 0
 
         self.client_id = None
         self.player_id = None
         self._connect_to_server(server=server)
-        # self._join_room(room)
 
     def run(self):
         self.ws.settimeout(0.05)
@@ -43,7 +48,6 @@ class CurvytronClient(threading.Thread):
                 recvd = self.ws.recv()
             except websocket.WebSocketTimeoutException:
                 continue
-            # if message[:2] == '[[':
             self._process_recvd(recvd)
 
     def join(self, timeout=None):
@@ -57,10 +61,14 @@ class CurvytronClient(threading.Thread):
             self._parse_message(message)
 
     def _parse_message(self, message):
+        if self.verbose:
+            print "parsing message: ", message
 
         if message[0] == 'position':
             pos = (message[1][1], message[1][2])
             if self.game['players'][message[1][0]]['printing']:
+                if self.verbose:
+                    print "____ADDING TRAIL"
                 self.game['trails'][message[1][0]].append(pos)
             self.game['players'][message[1][0]]['position'] = pos
 
@@ -70,17 +78,35 @@ class CurvytronClient(threading.Thread):
         elif message[0] == 'property':
             self.game['players'][message[1][0]][message[1][1]] = message[1][2]
 
-        elif message[0] == "game:start":
+        elif message[0] == 'die':
+            if message[1][0] == self.player_id:
+                self.player_alive = False
+
+        elif message[0] == 'score:round':
+            if message[1][0] == self.player_id:
+                self.round_score = message[1][1]
+
+        elif message[0] == "game:start":  # message received at start of subsequent rounds
+            self.active_round = True
+
+        elif message[0] == "room:game:start":  # message received at start of game
             self.active_game = True
+            self._send_message(self.READY)
 
-        elif message[0] == "game:stop":
+        elif message[0] == "game:stop":  # message received at end of round
+            self.active_round = False
+
+        elif message[0] == "round:new":  # message received at start of round
+            pass  # might want to reset some parts of the state here?
+            self.active_round = True
+            self.round_score = 0
+            self.game['trails'] = defaultdict(list)
+            self.player_alive = True
+            for k in self.game['players'].keys():
+                self.game['players'][k]['printing'] = False
+
+        elif message[0] == "end":  # message received at end of game
             self.active_game = False
-
-        elif message[0] == "round:new":
-            pass  # self.active_game = False
-
-        elif message[0] == "round:end":
-            pass  # self.active_game = False
 
         elif message[0] == 'room:join':
             player_details = message[1]['player']
@@ -106,10 +132,10 @@ class CurvytronClient(threading.Thread):
         :return:
         """
         self.ws.connect('ws://%s' % server)
-        self._send_message(self.WHOAMI, {})
+        self._send_message(self.WHOAMI)
         response = self._recv_message()
         self.client_id = int(response[0][1])
-        self._send_message(self.FETCH_ROOMS, {})
+        self._send_message(self.FETCH_ROOMS)
 
     def _recv_message(self, timeout=None, default=None):
         if timeout:
@@ -139,7 +165,7 @@ class CurvytronClient(threading.Thread):
         """
 
         for room in self.server.get('rooms', []):
-            if room[1]['name'] == target_room:
+            if room['name'] == target_room:
                 break
         else:
             # create room
@@ -152,11 +178,11 @@ class CurvytronClient(threading.Thread):
         self._send_message(self.JOIN_ROOM, {'room_name': target_room})
         self._wait_for_reply(self.message_id)
         assert (self.message_responses[self.message_id]['success'])
-        self._send_message(self.ADD_PLAYER, {})
+        self._send_message(self.ADD_PLAYER)
         self._wait_for_reply(self.message_id)
         assert (self.message_responses[self.message_id]['success'])
 
-    def _send_message(self, message, message_args):
+    def _send_message(self, message, message_args=None):
         """
         Send a message to the server, substituting values
         in message_args dict for placeholders.
@@ -164,9 +190,16 @@ class CurvytronClient(threading.Thread):
         :param message_args:
         :return:
         """
+        if message_args is None:
+            message_args = {}
         self.message_id += 1
         self.ws.send(message.format(msg_id=self.message_id, client_id=self.client_id, player_id=self.player_id,
                                     player_name=self.name, player_color=self.color, **message_args))
 
     def send_action(self, action):
         self._send_message(self.PLAYER_MOVE, {'action': action})
+
+    def send_ready(self):
+        self._send_message(self.PLAYER_READY)
+        self._wait_for_reply(self.message_id)
+        assert (self.message_responses[self.message_id]['success'])
