@@ -107,6 +107,7 @@ class CurvytronClient(threading.Thread):
         :return:
         """
 
+        # FIXME: this check doesn't work if room is created before the client connects
         for room in self.server.get('rooms', []):
             if room['name'] == target_room:
                 break
@@ -117,6 +118,8 @@ class CurvytronClient(threading.Thread):
         self._send_message(self.JOIN_ROOM, {'room_name': target_room})
         self._wait_for_reply(self.message_id)
         assert (self.message_responses[self.message_id]['success'])
+        self._add_players(self.message_responses[self.message_id]['room']['players'])
+
         self._send_message(self.ADD_PLAYER)
         self._wait_for_reply(self.message_id)
         assert (self.message_responses[self.message_id]['success'])
@@ -140,12 +143,10 @@ class CurvytronClient(threading.Thread):
             print("parsing message: ", message)
 
         if message[0] == 'position':
-            pos = (message[1][1], message[1][2])
-            if self.game['players'][message[1][0]]['printing']:
-                if self.verbose:
-                    print("____ADDING TRAIL")
-                self.game['trails'][message[1][0]].append(pos)
-            self.game['players'][message[1][0]]['position'] = pos
+            pid,x,y = message[1]
+            if self.game['players'][pid]['printing']:
+                self.game['trails'][pid].append((x,y))
+            self.game['players'][pid]['position'] = (x,y)
 
         elif message[0] == 'angle':
             self.game['players'][message[1][0]]['angle'] = message[1][1]
@@ -243,3 +244,9 @@ class CurvytronClient(threading.Thread):
         self.message_id += 1
         self.ws.send(message.format(msg_id=self.message_id, client_id=self.client_id, player_id=self.player_id,
                                     player_name=self.name, player_color=self.color, **message_args))
+
+    def _add_players(self, players):
+        for player in players:
+            self.game['players'][player['id']] = {'name': player['name'],
+                                                  'color': '#ffffff',
+                                                  'printing': False}
