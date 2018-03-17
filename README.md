@@ -42,8 +42,6 @@ In your browser, mark the other user as ready. Once the game starts, the positio
 
 ### Not Finished.
 
-* May want to expand the parser for the messages
+* May want to expand the parser for the messages -- room closing/player leaving are two that might come up.
 * Think about the way game/ player information is seperated when being stored
-* Need to decide how to handle reset function of environment and implement any needed status tracking in the client.
-    * Reset function will probably just block until the client says it's in an active round. Will need to check the game is active, send ready signal if not.
-* Look at Pillow's ImageDraw module for the graphics
+* Graphical representation -- probably pyglets
