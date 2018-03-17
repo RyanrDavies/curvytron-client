@@ -55,6 +55,41 @@ class CurvytronClient(threading.Thread):
         self.ws.close()
         super(CurvytronClient, self).join(timeout)
 
+    def join_room(self, target_room):
+        """Doc string
+        If the provided room exists, join it.
+        Otherwise, create and configure the room,
+        and then join it.
+        :param target_room:
+        :return:
+        """
+
+        for room in self.server.get('rooms', []):
+            if room['name'] == target_room:
+                break
+        else:
+            # create room
+            self._send_message(self.MAKE_ROOM, {'room_name': target_room})
+            self._wait_for_reply(self.message_id)
+            assert(self.message_responses[self.message_id]['success'])
+            # TODO: Turn off bonuses
+
+        # join room
+        self._send_message(self.JOIN_ROOM, {'room_name': target_room})
+        self._wait_for_reply(self.message_id)
+        assert (self.message_responses[self.message_id]['success'])
+        self._send_message(self.ADD_PLAYER)
+        self._wait_for_reply(self.message_id)
+        assert (self.message_responses[self.message_id]['success'])
+
+    def send_action(self, action):
+        self._send_message(self.PLAYER_MOVE, {'action': action})
+
+    def send_ready(self):
+        self._send_message(self.PLAYER_READY)
+        self._wait_for_reply(self.message_id)
+        assert (self.message_responses[self.message_id]['success'])
+
     def _process_recvd(self, recvd):
         messages = json.loads(recvd)
         for message in messages:
@@ -155,33 +190,6 @@ class CurvytronClient(threading.Thread):
         while message_id not in self.message_responses:
             continue
 
-    def join_room(self, target_room):
-        """Doc string
-        If the provided room exists, join it.
-        Otherwise, create and configure the room,
-        and then join it.
-        :param target_room:
-        :return:
-        """
-
-        for room in self.server.get('rooms', []):
-            if room['name'] == target_room:
-                break
-        else:
-            # create room
-            self._send_message(self.MAKE_ROOM, {'room_name': target_room})
-            self._wait_for_reply(self.message_id)
-            assert(self.message_responses[self.message_id]['success'])
-            # TODO: Turn off bonuses
-
-        # join room
-        self._send_message(self.JOIN_ROOM, {'room_name': target_room})
-        self._wait_for_reply(self.message_id)
-        assert (self.message_responses[self.message_id]['success'])
-        self._send_message(self.ADD_PLAYER)
-        self._wait_for_reply(self.message_id)
-        assert (self.message_responses[self.message_id]['success'])
-
     def _send_message(self, message, message_args=None):
         """
         Send a message to the server, substituting values
@@ -195,11 +203,3 @@ class CurvytronClient(threading.Thread):
         self.message_id += 1
         self.ws.send(message.format(msg_id=self.message_id, client_id=self.client_id, player_id=self.player_id,
                                     player_name=self.name, player_color=self.color, **message_args))
-
-    def send_action(self, action):
-        self._send_message(self.PLAYER_MOVE, {'action': action})
-
-    def send_ready(self):
-        self._send_message(self.PLAYER_READY)
-        self._wait_for_reply(self.message_id)
-        assert (self.message_responses[self.message_id]['success'])
