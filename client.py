@@ -220,13 +220,14 @@ class CurvytronClient(threading.Thread):
         :param server:
         :return:
         """
-        self.connected = True
         self.ws.connect('ws://%s' % server)
+        self.connected = True
         self._send_message(self.WHOAMI)
         response = self._recv_message()
         self.client_id = int(response[0][1])
         self._send_message(self.FETCH_ROOMS)
         self.server['address'] = server
+
 
 
     def _recv_message(self, timeout=None, default=None):
