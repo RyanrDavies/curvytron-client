@@ -223,8 +223,8 @@ class CurvytronClient(threading.Thread):
         self.ws.connect('ws://%s' % server)
         self.connected = True
         self._send_message(self.WHOAMI)
-        response = self._recv_message()
-        self.client_id = int(response[0][1])
+        self._wait_for_reply(self.message_id)
+        self.client_id = self.message_responses[self.message_id]
         self._send_message(self.FETCH_ROOMS)
         self.server['address'] = server
 
