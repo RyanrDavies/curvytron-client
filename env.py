@@ -11,8 +11,9 @@ class CurvytronEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, server, room, **kwargs):
-        self.client = CurvytronClient(server, **kwargs)
+        self.client = CurvytronClient(**kwargs)
         self.client.start()
+        self.client.connect_to_server(server)
         self.client.join_room(room)
 
         # There's only three actions: left, right, ahead.

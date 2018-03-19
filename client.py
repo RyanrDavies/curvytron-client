@@ -46,6 +46,7 @@ class CurvytronClient(threading.Thread):
         self.alive = threading.Event()
         self.alive.set()
         self.verbose = verbose
+        self.connected = False
 
         self.name = name
         self.color = color
@@ -59,16 +60,16 @@ class CurvytronClient(threading.Thread):
 
         self.client_id = None
         self.player_id = None
-        self._connect_to_server(server=server)
 
     def run(self):
         self.ws.settimeout(0.05)
         while self.alive.isSet():
-            try:
-                recvd = self.ws.recv()
-            except websocket.WebSocketTimeoutException:
-                continue
-            self._process_recvd(recvd)
+            if self.connected:
+                try:
+                    recvd = self.ws.recv()
+                except websocket.WebSocketTimeoutException:
+                    continue
+                self._process_recvd(recvd)
 
     def join(self, timeout=None):
         self.alive.clear()
@@ -118,6 +119,8 @@ class CurvytronClient(threading.Thread):
         """
 
         # FIXME: this check doesn't work if room is created before the client connects
+        # This happens when we miss the reply to the fetch messages because this it happens too soon after starting.
+        # Think it's fixed, but leaving this until we're sure.
         for room in self.server.get('rooms', []):
             if room['name'] == target_room:
                 break
@@ -211,17 +214,19 @@ class CurvytronClient(threading.Thread):
         else:
             pass
 
-    def _connect_to_server(self, server):
+    def connect_to_server(self, server):
         """
         Connect to  the provided server and request client ID.
         :param server:
         :return:
         """
+        self.connected = True
         self.ws.connect('ws://%s' % server)
         self._send_message(self.WHOAMI)
         response = self._recv_message()
         self.client_id = int(response[0][1])
         self._send_message(self.FETCH_ROOMS)
+
 
     def _recv_message(self, timeout=None, default=None):
         if timeout:

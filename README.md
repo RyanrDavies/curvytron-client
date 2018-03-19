@@ -20,8 +20,9 @@ To see the client storing the positions of the players, run the following in an 
 import client
 server_address = '192.168.0.1:8080'
 #server_address = 'www.curvytron.com'
-pyclient = client.CurvytronClient(server=server_address)
+pyclient = client.CurvytronClient()
 pyclient.start()
+pyclient.connect_to_server(server=server_address)
 pyclient.join_room('room')
 ```
 Join the room as another player using your browser, but don't mark this user as ready yet. Then:
