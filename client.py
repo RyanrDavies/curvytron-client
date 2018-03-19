@@ -37,7 +37,7 @@ class CurvytronClient(threading.Thread):
     PLAYER_READY = '[["room:ready", {{"player": {player_id}}}, {msg_id}]]'
     BONUS_CHANGE_ROOM = '[["room:config:bonus",{{"bonus":"{bonus_name}","enabled":{enabled}}}, {msg_id}]]'
     
-    def __init__(self, server, name='pythonClient', color="#ffffff", verbose=False):
+    def __init__(self, name='pythonClient', color="#ffffff", verbose=False):
         super(CurvytronClient, self).__init__()
 
         self.message_id = -1
@@ -52,7 +52,7 @@ class CurvytronClient(threading.Thread):
         self.color = color
         self.game_state = None
         self.active_game = False
-        self.server = {'address': server, 'rooms': []}
+        self.server = {'address': '', 'rooms': []}
         self.game = {'players': {}, 'trails': defaultdict(list)}
         self.message_responses = {}
         self.player_alive = True
@@ -226,6 +226,7 @@ class CurvytronClient(threading.Thread):
         response = self._recv_message()
         self.client_id = int(response[0][1])
         self._send_message(self.FETCH_ROOMS)
+        self.server['address'] = server
 
 
     def _recv_message(self, timeout=None, default=None):
