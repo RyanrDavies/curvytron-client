@@ -2,6 +2,9 @@ import websocket
 import json
 import threading
 from collections import defaultdict
+import numpy as np
+
+from skimage import draw
 
 websocket.enableTrace(False)
 
@@ -52,11 +55,15 @@ class CurvytronClient(threading.Thread):
         self.color = color
         self.game_state = None
         self.active_game = False
+        self.active_round = False
         self.server = {'address': '', 'rooms': []}
         self.game = {'players': {}, 'trails': defaultdict(list)}
         self.message_responses = {}
         self.player_alive = True
         self.round_score = 0
+        self.board_size = 0
+        self.trails = None
+        self.heads = None
 
         self.client_id = None
         self.player_id = None
@@ -158,8 +165,10 @@ class CurvytronClient(threading.Thread):
         if message[0] == 'position':
             pid,x,y = message[1]
             if self.game['players'][pid]['printing']:
-                self.game['trails'][pid].append((x,y))
-            self.game['players'][pid]['position'] = (x,y)
+                #self.game['trails'][pid].append((x,y))
+                self._update_trails(message[1])
+            #self.game['players'][pid]['position'] = (x,y)
+            self._update_position(message[1])
 
         elif message[0] == 'angle':
             self.game['players'][message[1][0]]['angle'] = message[1][1]
@@ -180,6 +189,9 @@ class CurvytronClient(threading.Thread):
 
         elif message[0] == "room:game:start":  # message received at start of game
             self.active_game = True
+            self.board_size = int(np.sqrt((80*80) + ((len(self.game['players']) -1) * (80*80)/ 5.0))) * 100
+            self.trails = np.zeros((self.board_size,self.board_size),dtype=np.uint8)
+            self.heads = np.zeros((self.board_size, self.board_size), dtype=np.uint8)
             self._send_message(self.READY)
 
         elif message[0] == "game:stop":  # message received at end of round
@@ -267,3 +279,18 @@ class CurvytronClient(threading.Thread):
             self.game['players'][player['id']] = {'name': player['name'],
                                                   'color': '#ffffff',
                                                   'printing': False}
+
+    def _update_position(self,message):
+        pid,x,y = message
+        rr,cc = draw.circle(x,y,60)
+        self.heads = np.zeros((self.board_size, self.board_size), dtype=np.uint8)
+        self.heads[rr,cc] = 1
+
+    def _update_trails(self,message):
+        pid,x,y = message
+        rr,cc = draw.circle(x,y,60)
+        self.trails[rr,cc] = 1
+        
+
+    def get_canvas(self):
+        return np.clip(self.trails + self.heads,0,1)

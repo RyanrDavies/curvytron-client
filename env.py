@@ -5,7 +5,7 @@ from gym.utils import seeding
 import numpy as np
 
 from client import CurvytronClient
-
+import time
 
 class CurvytronEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -14,6 +14,7 @@ class CurvytronEnv(gym.Env):
         self.client = CurvytronClient(**kwargs)
         self.client.start()
         self.client.connect_to_server(server)
+        time.sleep(1)
         self.client.join_room(room)
 
         # There's only three actions: left, right, ahead.
@@ -30,7 +31,7 @@ class CurvytronEnv(gym.Env):
 
         observation = self.client.get_canvas()  # Or whatever the correct method is.
 
-        return observation, reward, self.client.player_alive and self.client.active_round
+        return observation, reward, not(self.client.player_alive and self.client.active_round)
 
     def reset(self):
         if not self.client.active_game:
