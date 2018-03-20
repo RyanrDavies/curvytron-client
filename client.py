@@ -40,7 +40,7 @@ class CurvytronClient(threading.Thread):
     PLAYER_READY = '[["room:ready", {{"player": {player_id}}}, {msg_id}]]'
     BONUS_CHANGE_ROOM = '[["room:config:bonus",{{"bonus":"{bonus_name}","enabled":{enabled}}}, {msg_id}]]'
     
-    def __init__(self, name='pythonClient', color="#ffffff", verbose=False):
+    def __init__(self, name='pythonClient', color="#ffffff",width=200, verbose=False):
         super(CurvytronClient, self).__init__()
 
         self.message_id = -1
@@ -61,9 +61,12 @@ class CurvytronClient(threading.Thread):
         self.message_responses = {}
         self.player_alive = True
         self.round_score = 0
+
         self.board_size = 0
         self.trails = None
         self.heads = None
+        self.width = width + 1
+        self.scale = 1
 
         self.client_id = None
         self.player_id = None
@@ -189,9 +192,10 @@ class CurvytronClient(threading.Thread):
 
         elif message[0] == "room:game:start":  # message received at start of game
             self.active_game = True
-            self.board_size = int(np.sqrt((80*80) + ((len(self.game['players']) -1) * (80*80)/ 5.0))) * 100
-            self.trails = np.zeros((self.board_size,self.board_size),dtype=np.uint8)
-            self.heads = np.zeros((self.board_size, self.board_size), dtype=np.uint8)
+            self.board_size = int(np.sqrt((80*80) + ((len(self.game['players']) -1) * (80*80)/ 5.0)))
+            self.scale = float(self.width) / self.board_size
+            self.trails = np.zeros((self.width,self.width),dtype=np.uint8)
+            self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
             self._send_message(self.READY)
 
         elif message[0] == "game:stop":  # message received at end of round
@@ -282,13 +286,19 @@ class CurvytronClient(threading.Thread):
 
     def _update_position(self,message):
         pid,x,y = message
-        rr,cc = draw.circle(x,y,60)
-        self.heads = np.zeros((self.board_size, self.board_size), dtype=np.uint8)
+        width = np.ceil(1.2*self.scale)
+        draw_x = (x/100.0) * self.scale
+        draw_y = (y/100.0) * self.scale
+        rr,cc = draw.circle(draw_y,draw_x,width/2)
+        self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
         self.heads[rr,cc] = 1
 
     def _update_trails(self,message):
         pid,x,y = message
-        rr,cc = draw.circle(x,y,60)
+        width = 1.2*self.scale
+        draw_x = (x/100.0) * self.scale
+        draw_y = (y/100.0) * self.scale
+        rr,cc = draw.circle(draw_y,draw_x,width/2)
         self.trails[rr,cc] = 1
         
 
