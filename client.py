@@ -62,10 +62,12 @@ class CurvytronClient(threading.Thread):
         self.player_alive = True
         self.round_score = 0
 
+        self.last_action = 0
+
         self.board_size = 0
         self.trails = None
         self.heads = None
-        self.width = width + 1
+        self.width = width
         self.scale = 1
 
         self.client_id = None
@@ -138,23 +140,27 @@ class CurvytronClient(threading.Thread):
             self.create_room(target_room)
         
         # join room
-        self._send_message(self.JOIN_ROOM, {'room_name': target_room})
+        msg_id = self._send_message(self.JOIN_ROOM, {'room_name': target_room})
         self._wait_for_reply(self.message_id)
-        assert (self.message_responses[self.message_id]['success'])
-        self._add_players(self.message_responses[self.message_id]['room']['players'])
+        assert (self.message_responses[msg_id]['success'])
+        self._add_players(self.message_responses[msg_id]['room']['players'])
 
-        self._send_message(self.ADD_PLAYER)
-        self._wait_for_reply(self.message_id)
-        assert (self.message_responses[self.message_id]['success'])
+        msg_id = self._send_message(self.ADD_PLAYER)
+        self._wait_for_reply(msg_id)
+        assert (self.message_responses[msg_id]['success'])
         self.set_bonuses(on_bonuses=on_bonuses)
 
     def send_action(self, action):
-        self._send_message(self.PLAYER_MOVE, {'action': action})
+        # Only send action if it's different from the last one to reduce
+        # number of messges being sent.
+        if not(self.last_action) == action:
+            self._send_message(self.PLAYER_MOVE, {'action': action})
+            self.last_action = action
 
     def send_ready(self):
-        self._send_message(self.PLAYER_READY)
-        self._wait_for_reply(self.message_id)
-        assert (self.message_responses[self.message_id]['success'])
+        msg_id = self._send_message(self.PLAYER_READY)
+        self._wait_for_reply(msg_id)
+        assert (self.message_responses[msg_id]['success'])
 
     def _process_recvd(self, recvd):
         messages = json.loads(recvd)
@@ -202,7 +208,8 @@ class CurvytronClient(threading.Thread):
             self.active_round = False
 
         elif message[0] == "round:new":  # message received at start of round
-            pass  # might want to reset some parts of the state here?
+            #pass  # might want to reset some parts of the state here?
+            self.last_action = 0
             self.active_round = True
             self.round_score = 0
             self.game['trails'] = defaultdict(list)
@@ -238,9 +245,9 @@ class CurvytronClient(threading.Thread):
         """
         self.ws.connect('ws://%s' % server)
         self.connected = True
-        self._send_message(self.WHOAMI)
-        self._wait_for_reply(self.message_id)
-        self.client_id = self.message_responses[self.message_id]
+        msg_id = self._send_message(self.WHOAMI)
+        self._wait_for_reply(msg_id)
+        self.client_id = self.message_responses[msg_id]
         self._send_message(self.FETCH_ROOMS)
         self.server['address'] = server
 
@@ -274,9 +281,12 @@ class CurvytronClient(threading.Thread):
         """
         if message_args is None:
             message_args = {}
-        self.message_id += 1
+        if '{msg_id}' in message:
+            self.message_id += 1
         self.ws.send(message.format(msg_id=self.message_id, client_id=self.client_id, player_id=self.player_id,
                                     player_name=self.name, player_color=self.color, **message_args))
+        if '{msg_id}' in message:
+            return self.message_id
 
     def _add_players(self, players):
         for player in players:
@@ -289,7 +299,7 @@ class CurvytronClient(threading.Thread):
         width = np.ceil(1.2*self.scale)
         draw_x = (x/100.0) * self.scale
         draw_y = (y/100.0) * self.scale
-        rr,cc = draw.circle(draw_y,draw_x,width/2)
+        rr,cc = draw.circle(draw_y,draw_x,width/2,shape=self.heads.shape)
         self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
         self.heads[rr,cc] = 1
 
@@ -298,7 +308,7 @@ class CurvytronClient(threading.Thread):
         width = 1.2*self.scale
         draw_x = (x/100.0) * self.scale
         draw_y = (y/100.0) * self.scale
-        rr,cc = draw.circle(draw_y,draw_x,width/2)
+        rr,cc = draw.circle(draw_y,draw_x,width/2,shape=self.trails.shape)
         self.trails[rr,cc] = 1
         
 

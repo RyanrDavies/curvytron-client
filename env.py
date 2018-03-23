@@ -24,19 +24,23 @@ class CurvytronEnv(gym.Env):
         self.action_set = {0:-1,1:0,2:1}
 
     def step(self, a):
-        reward = 0.0
+        reward = -10.0
 
         action = self.action_set[a]
-        self.client.send_action(action)
-
         observation = self.client.get_canvas()  # Or whatever the correct method is.
+        done = not(self.client.player_alive and self.client.active_round)
+        if not done:
+            self.client.send_action(action)
+            reward = 0.0
 
-        return observation, reward, not(self.client.player_alive and self.client.active_round)
+        return observation, reward, done
 
     def reset(self):
-        if not self.client.active_game:
-            self.client.send_ready()
-        while not self.client.active_round:
+        sent_ready = False
+        while not (self.client.active_round and self.client.player_alive):
+            if not (self.client.active_game and sent_ready):
+                self.client.send_ready()
+                sent_ready=True
             continue
 
     def render(self, mode='human', close=False):
