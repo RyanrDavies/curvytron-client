@@ -38,7 +38,7 @@ class CurvytronEnv(gym.Env):
     def reset(self):
         sent_ready = False
         while not (self.client.active_round and self.client.player_alive):
-            if not (self.client.active_game and sent_ready):
+            if not self.client.active_game and not sent_ready:
                 self.client.send_ready()
                 sent_ready=True
             continue
