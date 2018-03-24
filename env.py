@@ -10,7 +10,7 @@ import time
 class CurvytronEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, clientclass = client.CurvytronClient, server, room, **kwargs):
+    def __init__(self, server, room, clientclass = client.CurvytronClient, **kwargs):
         self.client = clientclass(**kwargs)
         self.client.start()
         self.client.connect_to_server(server)
