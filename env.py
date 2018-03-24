@@ -4,14 +4,14 @@ from gym.utils import seeding
 
 import numpy as np
 
-from client import CurvytronClient
+import client
 import time
 
 class CurvytronEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, server, room, **kwargs):
-        self.client = CurvytronClient(**kwargs)
+    def __init__(self, clientclass = client.CurvytronClient, server, room, **kwargs):
+        self.client = clientclass(**kwargs)
         self.client.start()
         self.client.connect_to_server(server)
         time.sleep(1)

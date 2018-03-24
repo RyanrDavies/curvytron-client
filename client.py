@@ -8,7 +8,9 @@ from skimage import draw
 
 websocket.enableTrace(False)
 
-class CurvytronClient(threading.Thread):
+__all__ = ['CurvytronClient', 'CurvytronClientBase']
+
+class CurvytronClientBase(threading.Thread):
     BONUS_NAMES = [
         'BonusSelfSmall',
         'BonusSelfSlow',
@@ -39,8 +41,9 @@ class CurvytronClient(threading.Thread):
     READY = '[["ready"]]'
     PLAYER_READY = '[["room:ready", {{"player": {player_id}}}, {msg_id}]]'
     BONUS_CHANGE_ROOM = '[["room:config:bonus",{{"bonus":"{bonus_name}","enabled":{enabled}}}, {msg_id}]]'
+    BOT_READY = '[["BOT:READY"]]'
     
-    def __init__(self, name='pythonClient', color="#ffffff",width=200, verbose=False):
+    def __init__(self, name='pythonClient', color="#ffffff",width=200, verbose=False,n_frames=3,stepped=False):
         super(CurvytronClient, self).__init__()
 
         self.message_id = -1
@@ -61,6 +64,12 @@ class CurvytronClient(threading.Thread):
         self.message_responses = {}
         self.player_alive = True
         self.round_score = 0
+
+        self.stepped = stepped
+        if not self.stepped:
+            self.n_frames = 0
+        else:
+            self.n_frames = n_frames
 
         self.last_action = 0
 
@@ -156,6 +165,8 @@ class CurvytronClient(threading.Thread):
         if not(self.last_action) == action:
             self._send_message(self.PLAYER_MOVE, {'action': action})
             self.last_action = action
+        if self.stepped:
+            self._send_message(self.BOT_READY)
 
     def send_ready(self):
         msg_id = self._send_message(self.PLAYER_READY)
@@ -173,6 +184,8 @@ class CurvytronClient(threading.Thread):
 
         if message[0] == 'position':
             pid,x,y = message[1]
+            if self.stepped:
+                self.game['players'][pid]['updated'] = True
             if self.game['players'][pid]['printing']:
                 #self.game['trails'][pid].append((x,y))
                 self._update_trails(message[1])
@@ -295,7 +308,31 @@ class CurvytronClient(threading.Thread):
                                                   'printing': False}
 
     def _update_position(self,message):
-        pid,x,y = message
+        raise NotImplementedError
+
+
+    def _update_trails(self,message):
+        raise NotImplementedError
+        
+
+    def get_canvas(self):
+        frames = 0
+        while frames < self.n_frames:
+            while not all([self.game['players'][player].get('updated',False) for player in self.game['players'].keys()]):
+                continue
+            for player in self.game['players'].keys():
+                self.game['players'][player]['updated'] = False
+            frames += 1
+            self._send_message(self.BOT_READY)
+        return np.clip(self.trails + self.heads,0,1)
+
+
+class CurvytronClient(CurvytronClientBase):
+
+    def __init__(self,*args,**kwargs):
+        super(CurvytronClient, self).__init__(*args,**kwargs)
+
+    def _update_position(self,message):
         width = np.ceil(1.2*self.scale)
         draw_x = (x/100.0) * self.scale
         draw_y = (y/100.0) * self.scale
@@ -310,7 +347,13 @@ class CurvytronClient(threading.Thread):
         draw_y = (y/100.0) * self.scale
         rr,cc = draw.circle(draw_y,draw_x,width/2,shape=self.trails.shape)
         self.trails[rr,cc] = 1
-        
 
     def get_canvas(self):
-        return np.clip(self.trails + self.heads,0,1)
+        frames = 0
+        while frames < self.n_frames:
+            while not all([self.game['players'][player].get('updated',False) for player in self.game['players'].keys()]):
+                continue
+            for player in self.game['players'].keys():
+                self.game['players'][player]['updated'] = False
+            frames += 1
+            self._send_message(self.BOT_READY)
