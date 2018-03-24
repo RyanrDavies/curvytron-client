@@ -11,7 +11,7 @@ env.py is an interface around this that is compatible with the gym environments.
 ```bash
 conda create -n cc python=3 spyder
 conda activate cc
-pip install websockets-client scikit-image
+pip install websocket-client scikit-image
 ```
 
 ***
