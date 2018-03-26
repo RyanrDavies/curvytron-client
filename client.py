@@ -176,7 +176,7 @@ class CurvytronClient(threading.Thread):
 
     def _parse_message(self, message):
         if self.verbose:
-            print("parsing message: ", message)
+            print("[{}] parsing message: {}".format(self.name, message))
 
         if message[0] == 'position':
             pid,x,y = message[1]
@@ -227,6 +227,8 @@ class CurvytronClient(threading.Thread):
             self.player_alive = True
             for k in self.game['players'].keys():
                 self.game['players'][k]['printing'] = False
+            self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
+            self.trails = np.zeros((self.width, self.width), dtype=np.uint8)
 
         elif message[0] == "end":  # message received at end of game
             self.active_game = False
@@ -325,7 +327,6 @@ class CurvytronClient(threading.Thread):
         draw_y = (y/100.0) * self.scale
         rr,cc = draw.circle(draw_y,draw_x,width/2,shape=self.trails.shape)
         self.trails[rr,cc] = 1
-        
 
     def get_canvas(self):
-        return np.clip(self.trails + self.heads,0,1)
+        return np.clip(self.trails,0,1)
