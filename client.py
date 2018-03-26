@@ -235,7 +235,9 @@ class CurvytronClient(threading.Thread):
         if self.verbose:
             print("[{}] parsing message: {}".format(self.name, message))
 
-        head, body = message
+        head = message[0]
+        if len(message) > 1:
+            body = message[1]
 
         if head == 'position':
             pid, x, y = body
