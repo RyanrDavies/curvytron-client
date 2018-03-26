@@ -36,6 +36,9 @@ class Player(object):
         self.updated = updated
         self.angle = angle
 
+    def set_property(self, property, value):
+        return setattr(self, property, value)
+
 
 class CurvytronClient(threading.Thread):
     BONUS_NAMES = [
@@ -255,7 +258,7 @@ class CurvytronClient(threading.Thread):
                 self.angle = angle
 
         elif head == 'property':
-            self.game.players[body[0]][body[1]] = body[2]
+            self.game.players[body[0]].set_property(body[1], body[2])
 
         elif head == 'die':
             if body[0] == self.player_id:
