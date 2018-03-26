@@ -78,6 +78,8 @@ class CurvytronClientBase(threading.Thread):
         self.heads = None
         self.width = width
         self.scale = 1
+        self.position = None
+        self.angle = None
 
         self.client_id = None
         self.player_id = None
@@ -90,7 +92,9 @@ class CurvytronClientBase(threading.Thread):
                     recvd = self.ws.recv()
                 except websocket.WebSocketTimeoutException:
                     continue
-                self._process_recvd(recvd)
+
+                if recvd:
+                    self._process_recvd(recvd)
 
     def join(self, timeout=None):
         self.alive.clear()
@@ -144,8 +148,10 @@ class CurvytronClientBase(threading.Thread):
         # Think it's fixed, but leaving this until we're sure.
         for room in self.server.get('rooms', []):
             if room['name'] == target_room:
+                joined_existing = True
                 break
         else:
+            joined_existing = False
             self.create_room(target_room)
         
         # join room
@@ -157,7 +163,8 @@ class CurvytronClientBase(threading.Thread):
         msg_id = self._send_message(self.ADD_PLAYER)
         self._wait_for_reply(msg_id)
         assert (self.message_responses[msg_id]['success'])
-        self.set_bonuses(on_bonuses=on_bonuses)
+        if not joined_existing:
+            self.set_bonuses(on_bonuses=on_bonuses)
 
     def send_action(self, action):
         # Only send action if it's different from the last one to reduce
@@ -180,7 +187,7 @@ class CurvytronClientBase(threading.Thread):
 
     def _parse_message(self, message):
         if self.verbose:
-            print("parsing message: ", message)
+            print("[{}] parsing message: {}".format(self.name, message))
 
         if message[0] == 'position':
             pid,x,y = message[1]
@@ -193,7 +200,11 @@ class CurvytronClientBase(threading.Thread):
             self._update_position(message[1])
 
         elif message[0] == 'angle':
-            self.game['players'][message[1][0]]['angle'] = message[1][1]
+            pid,angle = message[1]
+            angle /= 100.0
+            self.game['players'][pid]['angle'] = angle
+            if pid == self.player_id:
+                self.angle = angle
 
         elif message[0] == 'property':
             self.game['players'][message[1][0]][message[1][1]] = message[1][2]
@@ -229,6 +240,8 @@ class CurvytronClientBase(threading.Thread):
             self.player_alive = True
             for k in self.game['players'].keys():
                 self.game['players'][k]['printing'] = False
+            self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
+            self.trails = np.zeros((self.width, self.width), dtype=np.uint8)
 
         elif message[0] == "end":  # message received at end of game
             self.active_game = False
@@ -336,6 +349,10 @@ class CurvytronClient(CurvytronClientBase):
         width = np.ceil(1.2*self.scale)
         draw_x = (x/100.0) * self.scale
         draw_y = (y/100.0) * self.scale
+
+        if pid == self.player_id:
+            self.position = (draw_y, draw_x)
+
         rr,cc = draw.circle(draw_y,draw_x,width/2,shape=self.heads.shape)
         self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
         self.heads[rr,cc] = 1
@@ -357,3 +374,4 @@ class CurvytronClient(CurvytronClientBase):
                 self.game['players'][player]['updated'] = False
             frames += 1
             self._send_message(self.BOT_READY)
+        return np.clip(self.trails,0,1)
