@@ -8,9 +8,10 @@ from skimage import draw
 
 websocket.enableTrace(False)
 
-__all__ = ['CurvytronClient', 'CurvytronClientBase']
+__all__ = ['CurvytronClient']
 
-class CurvytronClientBase(threading.Thread):
+
+class CurvytronClient(threading.Thread):
     BONUS_NAMES = [
         'BonusSelfSmall',
         'BonusSelfSlow',
@@ -43,7 +44,7 @@ class CurvytronClientBase(threading.Thread):
     BONUS_CHANGE_ROOM = '[["room:config:bonus",{{"bonus":"{bonus_name}","enabled":{enabled}}}, {msg_id}]]'
     BOT_READY = '[["BOT:READY"]]'
     
-    def __init__(self, name='pythonClient', color="#ffffff",width=200, verbose=False,n_frames=3,stepped=False):
+    def __init__(self, name='pythonClient', color="#ffffff", width=200, verbose=False, n_frames=3, stepped=False):
         super(CurvytronClient, self).__init__()
 
         self.message_id = -1
@@ -140,12 +141,9 @@ class CurvytronClientBase(threading.Thread):
         Otherwise, create and configure the room,
         and then join it.
         :param target_room:
+        :param on_bonuses:
         :return:
         """
-
-        # FIXME: this check doesn't work if room is created before the client connects
-        # This happens when we miss the reply to the fetch messages because this it happens too soon after starting.
-        # Think it's fixed, but leaving this until we're sure.
         for room in self.server.get('rooms', []):
             if room['name'] == target_room:
                 joined_existing = True
@@ -167,9 +165,7 @@ class CurvytronClientBase(threading.Thread):
             self.set_bonuses(on_bonuses=on_bonuses)
 
     def send_action(self, action):
-        # Only send action if it's different from the last one to reduce
-        # number of messges being sent.
-        if not(self.last_action) == action:
+        if not self.last_action == action:
             self._send_message(self.PLAYER_MOVE, {'action': action})
             self.last_action = action
         if self.stepped:
@@ -190,17 +186,15 @@ class CurvytronClientBase(threading.Thread):
             print("[{}] parsing message: {}".format(self.name, message))
 
         if message[0] == 'position':
-            pid,x,y = message[1]
+            pid, x, y = message[1]
             if self.stepped:
                 self.game['players'][pid]['updated'] = True
             if self.game['players'][pid]['printing']:
-                #self.game['trails'][pid].append((x,y))
                 self._update_trails(message[1])
-            #self.game['players'][pid]['position'] = (x,y)
             self._update_position(message[1])
 
         elif message[0] == 'angle':
-            pid,angle = message[1]
+            pid, angle = message[1]
             angle /= 100.0
             self.game['players'][pid]['angle'] = angle
             if pid == self.player_id:
@@ -222,9 +216,9 @@ class CurvytronClientBase(threading.Thread):
 
         elif message[0] == "room:game:start":  # message received at start of game
             self.active_game = True
-            self.board_size = int(np.sqrt((80*80) + ((len(self.game['players']) -1) * (80*80)/ 5.0)))
+            self.board_size = int(np.sqrt((80*80) + ((len(self.game['players']) - 1) * (80*80) / 5.0)))
             self.scale = float(self.width) / self.board_size
-            self.trails = np.zeros((self.width,self.width),dtype=np.uint8)
+            self.trails = np.zeros((self.width, self.width), dtype=np.uint8)
             self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
             self._send_message(self.READY)
 
@@ -232,7 +226,6 @@ class CurvytronClientBase(threading.Thread):
             self.active_round = False
 
         elif message[0] == "round:new":  # message received at start of round
-            #pass  # might want to reset some parts of the state here?
             self.last_action = 0
             self.active_round = True
             self.round_score = 0
@@ -277,8 +270,6 @@ class CurvytronClientBase(threading.Thread):
         self._send_message(self.FETCH_ROOMS)
         self.server['address'] = server
 
-
-
     def _recv_message(self, timeout=None, default=None):
         if timeout:
             prev_timeout = self.ws.gettimeout()
@@ -320,32 +311,8 @@ class CurvytronClientBase(threading.Thread):
                                                   'color': '#ffffff',
                                                   'printing': False}
 
-    def _update_position(self,message):
-        raise NotImplementedError
-
-
-    def _update_trails(self,message):
-        raise NotImplementedError
-        
-
-    def get_canvas(self):
-        frames = 0
-        while frames < self.n_frames:
-            while not all([self.game['players'][player].get('updated',False) for player in self.game['players'].keys()]):
-                continue
-            for player in self.game['players'].keys():
-                self.game['players'][player]['updated'] = False
-            frames += 1
-            self._send_message(self.BOT_READY)
-        return np.clip(self.trails + self.heads,0,1)
-
-
-class CurvytronClient(CurvytronClientBase):
-
-    def __init__(self,*args,**kwargs):
-        super(CurvytronClient, self).__init__(*args,**kwargs)
-
-    def _update_position(self,message):
+    def _update_position(self, message):
+        pid, x, y = message
         width = np.ceil(1.2*self.scale)
         draw_x = (x/100.0) * self.scale
         draw_y = (y/100.0) * self.scale
@@ -353,25 +320,25 @@ class CurvytronClient(CurvytronClientBase):
         if pid == self.player_id:
             self.position = (draw_y, draw_x)
 
-        rr,cc = draw.circle(draw_y,draw_x,width/2,shape=self.heads.shape)
+        rr, cc = draw.circle(draw_y, draw_x, width/2, shape=self.heads.shape)
         self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
-        self.heads[rr,cc] = 1
+        self.heads[rr, cc] = 1
 
-    def _update_trails(self,message):
-        pid,x,y = message
+    def _update_trails(self, message):
+        pid, x, y = message
         width = 1.2*self.scale
         draw_x = (x/100.0) * self.scale
         draw_y = (y/100.0) * self.scale
-        rr,cc = draw.circle(draw_y,draw_x,width/2,shape=self.trails.shape)
-        self.trails[rr,cc] = 1
+        rr, cc = draw.circle(draw_y, draw_x, width/2, shape=self.trails.shape)
+        self.trails[rr, cc] = 1
 
     def get_canvas(self):
         frames = 0
         while frames < self.n_frames:
-            while not all([self.game['players'][player].get('updated',False) for player in self.game['players'].keys()]):
+            while not all([self.game['players'][player].get('updated', False) for player in self.game['players'].keys()]):
                 continue
             for player in self.game['players'].keys():
                 self.game['players'][player]['updated'] = False
             frames += 1
             self._send_message(self.BOT_READY)
-        return np.clip(self.trails,0,1)
+        return np.clip(self.trails, 0, 1)
