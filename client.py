@@ -67,7 +67,7 @@ class CurvytronClient(threading.Thread):
     PLAYER_READY = '[["room:ready", {{"player": {player_id}}}, {msg_id}]]'
     BONUS_CHANGE_ROOM = '[["room:config:bonus",{{"bonus":"{bonus_name}","enabled":{enabled}}}, {msg_id}]]'
     BOT_READY = '[["BOT:READY"]]'
-    
+
     def __init__(self, name='pythonClient', color="#ffffff", width=200, verbose=False, n_frames=3, stepped=False):
         super(CurvytronClient, self).__init__()
 
@@ -109,22 +109,19 @@ class CurvytronClient(threading.Thread):
         self.client_id = None
         self.player_id = None
 
-    def run(self):
-        self.ws.settimeout(0.05)
-        while self.alive.isSet():
-            if self.connected:
-                try:
-                    recvd = self.ws.recv()
-                except websocket.WebSocketTimeoutException:
-                    continue
-
-                if recvd:
-                    self._process_recvd(recvd)
-
-    def join(self, timeout=None):
-        self.alive.clear()
-        self.ws.close()
-        super(CurvytronClient, self).join(timeout)
+    def connect_to_server(self, server):
+        """
+        Connect to  the provided server and request client ID.
+        :param server:
+        :return:
+        """
+        self.ws.connect('ws://%s' % server)
+        self.connected = True
+        msg_id = self._send_message(self.WHOAMI)
+        self._wait_for_reply(msg_id)
+        self.client_id = self.message_responses[msg_id]
+        self._send_message(self.FETCH_ROOMS)
+        self.server.address = server
 
     def create_room(self, target_room=None):
         """Create room called target_room with bonuses listed in bonuses
@@ -133,32 +130,24 @@ class CurvytronClient(threading.Thread):
             assert room['name'] != target_room, "Room already exists"
         self._send_message(self.MAKE_ROOM, {'room_name': target_room})
         self._wait_for_reply(self.message_id)
-        assert(self.message_responses[self.message_id]['success'])
-        
-    def set_bonuses(self, on_bonuses=None):
-        BONUS_NAMES = self.BONUS_NAMES
+        assert (self.message_responses[self.message_id]['success'])
 
-        if on_bonuses in self.BONUS_PRESETS:
-            on_bonuses = self.BONUS_PRESETS[on_bonuses]
+    def get_canvas(self):
+        frames = 0
+        while frames < self.n_frames:
+            while not all([self.game.players[player].updated for player in self.game.players.keys()]):
+                continue
+            for player in self.game.players.keys():
+                self.game.players[player].updated = False
+            frames += 1
+            self._send_message(self.BOT_READY)
+        return np.clip(self.trails, 0, 1)
 
-        if on_bonuses is None:
-            off_bonuses = BONUS_NAMES
-            for bonus_name in off_bonuses:
-                self._send_message(self.BONUS_CHANGE_ROOM, 
-                                   {'bonus_name': bonus_name,
-                                    'enabled': 'false'})
-        else:
-            invalid_bonus_names = [bb for bb in on_bonuses 
-                                   if bb not in BONUS_NAMES]
-            assert len(invalid_bonus_names) == 0,\
-                "{} are not in valid bonus names ({})".format(
-                        invalid_bonus_names, BONUS_NAMES)
-            off_bonuses = [bb for bb in BONUS_NAMES if bb not in on_bonuses]
-            for bonus_name in off_bonuses:
-                self._send_message(self.BONUS_CHANGE_ROOM, 
-                                   {'bonus_name': bonus_name,
-                                    'enabled': 'false'})
-        
+    def join(self, timeout=None):
+        self.alive.clear()
+        self.ws.close()
+        super(CurvytronClient, self).join(timeout)
+
     def join_room(self, target_room, on_bonuses=None):
         """Doc string
         If the provided room exists, join it.
@@ -175,7 +164,7 @@ class CurvytronClient(threading.Thread):
         else:
             joined_existing = False
             self.create_room(target_room)
-        
+
         # join room
         msg_id = self._send_message(self.JOIN_ROOM, {'room_name': target_room})
         self._wait_for_reply(self.message_id)
@@ -187,6 +176,18 @@ class CurvytronClient(threading.Thread):
         assert (self.message_responses[msg_id]['success'])
         if not joined_existing:
             self.set_bonuses(on_bonuses=on_bonuses)
+
+    def run(self):
+        self.ws.settimeout(0.05)
+        while self.alive.isSet():
+            if self.connected:
+                try:
+                    recvd = self.ws.recv()
+                except websocket.WebSocketTimeoutException:
+                    continue
+
+                if recvd:
+                    self._process_recvd(recvd)
 
     def send_action(self, action):
         if not self.last_action == action:
@@ -200,10 +201,33 @@ class CurvytronClient(threading.Thread):
         self._wait_for_reply(msg_id)
         assert (self.message_responses[msg_id]['success'])
 
-    def _process_recvd(self, recvd):
-        messages = json.loads(recvd)
-        for message in messages:
-            self._parse_message(message)
+    def set_bonuses(self, on_bonuses=None):
+        BONUS_NAMES = self.BONUS_NAMES
+
+        if on_bonuses in self.BONUS_PRESETS:
+            on_bonuses = self.BONUS_PRESETS[on_bonuses]
+
+        if on_bonuses is None:
+            off_bonuses = BONUS_NAMES
+            for bonus_name in off_bonuses:
+                self._send_message(self.BONUS_CHANGE_ROOM,
+                                   {'bonus_name': bonus_name,
+                                    'enabled': 'false'})
+        else:
+            invalid_bonus_names = [bb for bb in on_bonuses
+                                   if bb not in BONUS_NAMES]
+            assert len(invalid_bonus_names) == 0, "{} are not in valid bonus names ({})".format(invalid_bonus_names, BONUS_NAMES)
+            off_bonuses = [bb for bb in BONUS_NAMES if bb not in on_bonuses]
+            for bonus_name in off_bonuses:
+                self._send_message(self.BONUS_CHANGE_ROOM,
+                                   {'bonus_name': bonus_name,
+                                    'enabled': 'false'})
+
+    def _add_players(self, players):
+        for player in players:
+            self.game.players[player['id']] = Player(**{'name': player['name'],
+                                                        'color': '#ffffff',
+                                                        'printing': False})
 
     def _parse_message(self, message):
         if self.verbose:
@@ -242,7 +266,7 @@ class CurvytronClient(threading.Thread):
 
         elif head == "room:game:start":  # message received at start of game
             self.active_game = True
-            self.board_size = int(np.sqrt((80*80) + ((len(self.game.players) - 1) * (80*80) / 5.0)))
+            self.board_size = int(np.sqrt((80 * 80) + ((len(self.game.players) - 1) * (80 * 80) / 5.0)))
             self.scale = float(self.width) / self.board_size
             self.trails = np.zeros((self.width, self.width), dtype=np.uint8)
             self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
@@ -268,8 +292,8 @@ class CurvytronClient(threading.Thread):
         elif head == 'room:join':
             player_details = body['player']
             self.game.players[player_details['id']] = Player(**{'name': player_details['name'],
-                                                          'color': player_details['color'],
-                                                          'printing': False})
+                                                                'color': player_details['color'],
+                                                                'printing': False})
             if player_details['name'] == self.name and player_details['client'] == self.client_id:
                 self.player_id = player_details['id']
 
@@ -282,19 +306,10 @@ class CurvytronClient(threading.Thread):
         else:
             pass
 
-    def connect_to_server(self, server):
-        """
-        Connect to  the provided server and request client ID.
-        :param server:
-        :return:
-        """
-        self.ws.connect('ws://%s' % server)
-        self.connected = True
-        msg_id = self._send_message(self.WHOAMI)
-        self._wait_for_reply(msg_id)
-        self.client_id = self.message_responses[msg_id]
-        self._send_message(self.FETCH_ROOMS)
-        self.server.address = server
+    def _process_recvd(self, recvd):
+        messages = json.loads(recvd)
+        for message in messages:
+            self._parse_message(message)
 
     def _recv_message(self, timeout=None, default=None):
         if timeout:
@@ -309,10 +324,6 @@ class CurvytronClient(threading.Thread):
         else:
             message = json.loads(self.ws.recv())
         return message
-
-    def _wait_for_reply(self, message_id):
-        while message_id not in self.message_responses:
-            continue
 
     def _send_message(self, message, message_args=None):
         """
@@ -331,42 +342,27 @@ class CurvytronClient(threading.Thread):
         if '{msg_id}' in message:
             return self.message_id
 
-    def _add_players(self, players):
-        for player in players:
-            self.game.players[player['id']] = Player(**{'name': player['name'],
-                                                  'color': '#ffffff',
-                                                  'printing': False})
-
     def _update_position(self, message):
         pid, x, y = message
-        width = np.ceil(1.2*self.scale)
-        draw_x = (x/100.0) * self.scale
-        draw_y = (y/100.0) * self.scale
+        width = np.ceil(1.2 * self.scale)
+        draw_x = (x / 100.0) * self.scale
+        draw_y = (y / 100.0) * self.scale
 
         if pid == self.player_id:
             self.position = (draw_y, draw_x)
 
-        rr, cc = draw.circle(draw_y, draw_x, width/2, shape=self.heads.shape)
+        rr, cc = draw.circle(draw_y, draw_x, width / 2, shape=self.heads.shape)
         self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
         self.heads[rr, cc] = 1
 
     def _update_trails(self, message):
         pid, x, y = message
-        width = 1.2*self.scale
-        draw_x = (x/100.0) * self.scale
-        draw_y = (y/100.0) * self.scale
-        rr, cc = draw.circle(draw_y, draw_x, width/2, shape=self.trails.shape)
+        width = 1.2 * self.scale
+        draw_x = (x / 100.0) * self.scale
+        draw_y = (y / 100.0) * self.scale
+        rr, cc = draw.circle(draw_y, draw_x, width / 2, shape=self.trails.shape)
         self.trails[rr, cc] = 1
 
-    def get_canvas(self):
-        frames = 0
-        while frames < self.n_frames:
-            while not all([self.game.players[player].updated for player in self.game.players.keys()]):
-                continue
-            for player in self.game.players.keys():
-                self.game.players[player].updated = False
-            frames += 1
-            self._send_message(self.BOT_READY)
-        return np.clip(self.trails, 0, 1)
-
-
+    def _wait_for_reply(self, message_id):
+        while message_id not in self.message_responses:
+            continue
