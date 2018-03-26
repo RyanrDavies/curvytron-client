@@ -81,7 +81,9 @@ class CurvytronClient(threading.Thread):
                     recvd = self.ws.recv()
                 except websocket.WebSocketTimeoutException:
                     continue
-                self._process_recvd(recvd)
+
+                if recvd:
+                    self._process_recvd(recvd)
 
     def join(self, timeout=None):
         self.alive.clear()
