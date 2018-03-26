@@ -11,6 +11,30 @@ websocket.enableTrace(False)
 __all__ = ['CurvytronClient']
 
 
+class Game(object):
+
+    def __init__(self):
+        self.players = {}
+        self.trails = defaultdict(list)
+
+
+class Server(object):
+
+    def __init__(self):
+        self.address = ''
+        self.rooms = []
+
+
+class Player(object):
+
+    def __init__(self, name, color, angle=None, printing=False, updated=False):
+        self.name = name
+        self.color = color
+        self.printing = printing
+        self.updated = updated
+        self.angle = angle
+
+
 class CurvytronClient(threading.Thread):
     BONUS_NAMES = [
         'BonusSelfSmall',
@@ -60,8 +84,8 @@ class CurvytronClient(threading.Thread):
         self.game_state = None
         self.active_game = False
         self.active_round = False
-        self.server = {'address': '', 'rooms': []}
-        self.game = {'players': {}, 'trails': defaultdict(list)}
+        self.server = Server()
+        self.game = Game()
         self.message_responses = {}
         self.player_alive = True
         self.round_score = 0
@@ -105,7 +129,7 @@ class CurvytronClient(threading.Thread):
     def create_room(self, target_room=None):
         """Create room called target_room with bonuses listed in bonuses
         """
-        for room in self.server.get('rooms', []):
+        for room in self.server.rooms:
             assert room['name'] != target_room, "Room already exists"
         self._send_message(self.MAKE_ROOM, {'room_name': target_room})
         self._wait_for_reply(self.message_id)
@@ -144,7 +168,7 @@ class CurvytronClient(threading.Thread):
         :param on_bonuses:
         :return:
         """
-        for room in self.server.get('rooms', []):
+        for room in self.server.rooms:
             if room['name'] == target_room:
                 joined_existing = True
                 break
@@ -185,73 +209,75 @@ class CurvytronClient(threading.Thread):
         if self.verbose:
             print("[{}] parsing message: {}".format(self.name, message))
 
-        if message[0] == 'position':
-            pid, x, y = message[1]
-            if self.stepped:
-                self.game['players'][pid]['updated'] = True
-            if self.game['players'][pid]['printing']:
-                self._update_trails(message[1])
-            self._update_position(message[1])
+        head, body = message
 
-        elif message[0] == 'angle':
-            pid, angle = message[1]
+        if head == 'position':
+            pid, x, y = body
+            if self.stepped:
+                self.game.players[pid].updated = True
+            if self.game.players[pid].printing:
+                self._update_trails(body)
+            self._update_position(body)
+
+        elif head == 'angle':
+            pid, angle = body
             angle /= 100.0
-            self.game['players'][pid]['angle'] = angle
+            self.game.players[pid].angle = angle
             if pid == self.player_id:
                 self.angle = angle
 
-        elif message[0] == 'property':
-            self.game['players'][message[1][0]][message[1][1]] = message[1][2]
+        elif head == 'property':
+            self.game.players[body[0]][body[1]] = body[2]
 
-        elif message[0] == 'die':
-            if message[1][0] == self.player_id:
+        elif head == 'die':
+            if body[0] == self.player_id:
                 self.player_alive = False
 
-        elif message[0] == 'score:round':
-            if message[1][0] == self.player_id:
-                self.round_score = message[1][1]
+        elif head == 'score:round':
+            if body[0] == self.player_id:
+                self.round_score = body[1]
 
-        elif message[0] == "game:start":  # message received at start of subsequent rounds
+        elif head == "game:start":  # message received at start of subsequent rounds
             self.active_round = True
 
-        elif message[0] == "room:game:start":  # message received at start of game
+        elif head == "room:game:start":  # message received at start of game
             self.active_game = True
-            self.board_size = int(np.sqrt((80*80) + ((len(self.game['players']) - 1) * (80*80) / 5.0)))
+            self.board_size = int(np.sqrt((80*80) + ((len(self.game.players) - 1) * (80*80) / 5.0)))
             self.scale = float(self.width) / self.board_size
             self.trails = np.zeros((self.width, self.width), dtype=np.uint8)
             self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
             self._send_message(self.READY)
 
-        elif message[0] == "game:stop":  # message received at end of round
+        elif head == "game:stop":  # message received at end of round
             self.active_round = False
 
-        elif message[0] == "round:new":  # message received at start of round
+        elif head == "round:new":  # message received at start of round
             self.last_action = 0
             self.active_round = True
             self.round_score = 0
-            self.game['trails'] = defaultdict(list)
+            self.game.trails = defaultdict(list)
             self.player_alive = True
-            for k in self.game['players'].keys():
-                self.game['players'][k]['printing'] = False
+            for k in self.game.players.keys():
+                self.game.players[k].printing = False
             self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
             self.trails = np.zeros((self.width, self.width), dtype=np.uint8)
 
-        elif message[0] == "end":  # message received at end of game
+        elif head == "end":  # message received at end of game
             self.active_game = False
 
-        elif message[0] == 'room:join':
-            player_details = message[1]['player']
-            self.game['players'][player_details['id']] = {'name': player_details['name'],
+        elif head == 'room:join':
+            player_details = body['player']
+            self.game.players[player_details['id']] = Player(**{'name': player_details['name'],
                                                           'color': player_details['color'],
-                                                          'printing': False}
+                                                          'printing': False})
             if player_details['name'] == self.name and player_details['client'] == self.client_id:
                 self.player_id = player_details['id']
 
-        elif message[0] == 'room:open':
-            self.server['rooms'].append(message[1])
+        elif head == 'room:open':
+            self.server.rooms.append(body)
 
-        elif isinstance(message[0], int):
-            self.message_responses[message[0]] = message[1]
+        elif isinstance(head, int):
+            self.message_responses[head] = body
 
         else:
             pass
@@ -268,7 +294,7 @@ class CurvytronClient(threading.Thread):
         self._wait_for_reply(msg_id)
         self.client_id = self.message_responses[msg_id]
         self._send_message(self.FETCH_ROOMS)
-        self.server['address'] = server
+        self.server.address = server
 
     def _recv_message(self, timeout=None, default=None):
         if timeout:
@@ -307,9 +333,9 @@ class CurvytronClient(threading.Thread):
 
     def _add_players(self, players):
         for player in players:
-            self.game['players'][player['id']] = {'name': player['name'],
+            self.game.players[player['id']] = Player(**{'name': player['name'],
                                                   'color': '#ffffff',
-                                                  'printing': False}
+                                                  'printing': False})
 
     def _update_position(self, message):
         pid, x, y = message
@@ -335,10 +361,12 @@ class CurvytronClient(threading.Thread):
     def get_canvas(self):
         frames = 0
         while frames < self.n_frames:
-            while not all([self.game['players'][player].get('updated', False) for player in self.game['players'].keys()]):
+            while not all([self.game.players[player].updated for player in self.game.players.keys()]):
                 continue
-            for player in self.game['players'].keys():
-                self.game['players'][player]['updated'] = False
+            for player in self.game.players.keys():
+                self.game.players[player].updated = False
             frames += 1
             self._send_message(self.BOT_READY)
         return np.clip(self.trails, 0, 1)
+
+
