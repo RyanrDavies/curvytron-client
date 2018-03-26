@@ -69,6 +69,8 @@ class CurvytronClient(threading.Thread):
         self.heads = None
         self.width = width
         self.scale = 1
+        self.position = None
+        self.angle = None
 
         self.client_id = None
         self.player_id = None
@@ -185,7 +187,11 @@ class CurvytronClient(threading.Thread):
             self._update_position(message[1])
 
         elif message[0] == 'angle':
-            self.game['players'][message[1][0]]['angle'] = message[1][1]
+            pid,angle = message[1]
+            angle /= 100.0
+            self.game['players'][pid]['angle'] = angle
+            if pid == self.player_id:
+                self.angle = angle
 
         elif message[0] == 'property':
             self.game['players'][message[1][0]][message[1][1]] = message[1][2]
@@ -304,6 +310,10 @@ class CurvytronClient(threading.Thread):
         width = np.ceil(1.2*self.scale)
         draw_x = (x/100.0) * self.scale
         draw_y = (y/100.0) * self.scale
+
+        if pid == self.player_id:
+            self.position = (draw_y, draw_x)
+
         rr,cc = draw.circle(draw_y,draw_x,width/2,shape=self.heads.shape)
         self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
         self.heads[rr,cc] = 1
