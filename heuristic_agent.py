@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function
+
 import time
 import numpy as np
 
@@ -6,7 +8,8 @@ import random
 from agent import Agent
 
 # serveraddress = "129.215.91.49:8080"
-serveraddress = "www.curvytron.com:80"
+# serveraddress = "www.curvytron.com:80"
+serveraddress = "127.0.0.1:8080"
 
 room = 'room_{}'.format(random.randint(0,10000))
 

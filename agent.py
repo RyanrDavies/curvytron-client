@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function
+
 import math
 import random
 import threading
@@ -6,6 +8,7 @@ import numpy as np
 from skimage.transform import rotate
 
 from env import CurvytronEnv
+
 
 class Agent(threading.Thread):
     def __init__(self, name, server, room, **kwargs):
