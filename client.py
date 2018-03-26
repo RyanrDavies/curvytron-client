@@ -137,8 +137,10 @@ class CurvytronClient(threading.Thread):
         # Think it's fixed, but leaving this until we're sure.
         for room in self.server.get('rooms', []):
             if room['name'] == target_room:
+                joined_existing = True
                 break
         else:
+            joined_existing = False
             self.create_room(target_room)
         
         # join room
@@ -150,7 +152,8 @@ class CurvytronClient(threading.Thread):
         msg_id = self._send_message(self.ADD_PLAYER)
         self._wait_for_reply(msg_id)
         assert (self.message_responses[msg_id]['success'])
-        self.set_bonuses(on_bonuses=on_bonuses)
+        if not joined_existing:
+            self.set_bonuses(on_bonuses=on_bonuses)
 
     def send_action(self, action):
         # Only send action if it's different from the last one to reduce
