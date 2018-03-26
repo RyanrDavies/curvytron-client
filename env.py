@@ -7,11 +7,15 @@ import numpy as np
 import client
 import time
 
+__all__ = ['CurvytronEnv']
+
+
 class State:
     def __init__(self, pixels, position, angle):
         self.angle = angle
         self.position = position
         self.pixels = pixels
+
 
 class CurvytronEnv(gym.Env):
     metadata = {'render.modes': ['human']}
