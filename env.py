@@ -7,6 +7,12 @@ import numpy as np
 import client
 import time
 
+class State:
+    def __init__(self, pixels, position, angle):
+        self.angle = angle
+        self.position = position
+        self.pixels = pixels
+
 class CurvytronEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
@@ -25,7 +31,6 @@ class CurvytronEnv(gym.Env):
 
     def step(self, a):
         reward = -10.0
-
         action = self.action_set[a]
         observation = self.client.get_canvas()  # Or whatever the correct method is.
         done = not(self.client.player_alive and self.client.active_round)
@@ -33,7 +38,8 @@ class CurvytronEnv(gym.Env):
             self.client.send_action(action)
             reward = 0.0
 
-        return observation, reward, done
+        state = State(self.client.get_canvas(), self.client.position, self.client.angle)
+        return state, reward, done
 
     def reset(self):
         sent_ready = False
@@ -41,7 +47,9 @@ class CurvytronEnv(gym.Env):
             if not self.client.active_game and not sent_ready:
                 self.client.send_ready()
                 sent_ready=True
+            time.sleep(0.5)
             continue
+        return State(self.client.get_canvas(), self.client.position, self.client.angle)
 
     def render(self, mode='human', close=False):
         pass
