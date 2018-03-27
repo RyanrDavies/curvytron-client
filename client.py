@@ -108,6 +108,7 @@ class CurvytronClient(threading.Thread):
         self.message_responses = {}
         self.player_alive = True
         self.round_score = 0
+        self.bg_color = hex_to_rgb("#222222")
 
         self.stepped = stepped
         if not self.stepped:
@@ -299,7 +300,7 @@ class CurvytronClient(threading.Thread):
             self.active_game = True
             self.board_size = int(np.sqrt((80 * 80) + ((len(self.game.players) - 1) * (80 * 80) / 5.0)))
             self.scale = float(self.width) / self.board_size
-            self.trails = np.zeros((self.width, self.width, 3), dtype=np.uint8)
+            self.trails = np.ones((self.width, self.width, 3), dtype=np.uint8) * 34  # set bg color
             self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
             self._send_message(self.READY)
 
@@ -315,7 +316,7 @@ class CurvytronClient(threading.Thread):
             for k in self.game.players.keys():
                 self.game.players[k].printing = False
             self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
-            self.trails = np.zeros((self.width, self.width, 3), dtype=np.uint8)
+            self.trails = np.ones((self.width, self.width, 3), dtype=np.uint8) * 34  # set bg color
 
         elif head == "end":  # message received at end of game
             self.active_game = False
