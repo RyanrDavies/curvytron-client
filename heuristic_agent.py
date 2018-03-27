@@ -213,7 +213,8 @@ class RaymanAgent(Agent):
         patch = self.extract_patch(state, self.patch_size)
         ray_len = get_ray_lengths(patch, ray_conf=self.ray_conf, 
                                   start_allowance=2, max_len=self.patch_size)
-        if ray_len['N'] < self.turning_distance:  # Something is ahead
+        
+        if ray_len['N'] <= self.turning_distance:  # Something is ahead
             if ray_len['NW'] == ray_len['NE']:
                 if ray_len['SW'] == ray_len['SE']:
                     if curr_action == 1:
@@ -224,13 +225,17 @@ class RaymanAgent(Agent):
                     choice = 0
                 else:
                     choice = 2
+            elif ray_len['NW'] > ray_len['NE']:
+                choice = 0
+            else:
+                choice = 2
         else:  # Nothing ahead
             choice = 1
             
         if self.display:  # and closest_right == closest_left == 1:
             for row in patch:
                 print(' '.join([DISPLAY_DICT[i] for i in row]))
-            print("rays: {} || move: {}".format(ray_len,choice))
+            print("rays: {} || move: {}".format(ray_len, choice))
             print("\033[{}A".format(self.patch_size+1), end='\r')
         return choice
 
@@ -243,7 +248,7 @@ if __name__ == '__main__':
     
     print('server: {} room: room_{}'.format(serveraddress, room))
 
-    agent = HeuristicAgent2('Us', serveraddress, room, display=True)
+    agent = RaymanAgent('Rayman', serveraddress, room, display=True)
 #    agent = RaymanAgent('RaymanAgent', server=serveraddress, room=room, 
 #                           display=True)
     opponents = [HeuristicAgent1('HeuristicAgent1', serveraddress, room),

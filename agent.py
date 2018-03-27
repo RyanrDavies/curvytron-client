@@ -42,7 +42,8 @@ class Agent(threading.Thread):
         # rotate's angle argument is how many degrees to rotate *anticlockwise*
         # Additionally, the coordinates are reversed in skimage
         ### pixels is the game board oriented in the direction of the agent ###
-        pixels = pad(state.pixels, hps+1, mode='constant', constant_values=1)
+        pixels = pad(state.pixels.astype('float'), hps+1, 
+                     mode='constant', constant_values=1)
         # Because of padding x0 <- x0 + hps + 1
         x0, x1 = x0+hps+1, x1+hps+1
         pixels_rot = rotate(image=pixels, angle=angle,
