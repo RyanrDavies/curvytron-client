@@ -7,6 +7,8 @@ import random
 
 from agent import Agent
 
+__all__ = ['RandomAgent', 'HeuristicAgent1', 'HeuristicAgent2', 'RaymanAgent']
+
 
 DEFAULT_ROOM = 'room_{}'.format(random.randint(0,10000))
 DISPLAY_DICT = {0: '.', 1: '#'}
@@ -111,6 +113,7 @@ class HeuristicAgent1(Agent):
         self.display = display
 
     def action(self, state):
+        state.pixels = np.clip(abs(state.pixels - self.env.client.bg_color[0]).sum(axis=2),0,1)
         patch = self.extract_patch(state, self.patch_size)
         sz = self.patch_size//2
         left, right = patch[:sz -2, :sz], patch[:sz -2, sz:]
@@ -156,6 +159,7 @@ class HeuristicAgent2(Agent):
         
     
     def action(self, state):
+        state.pixels = np.clip(abs(state.pixels - self.env.client.bg_color[0]).sum(axis=2), 0, 1)
         patch = self.extract_patch(state=state, patch_size=self.patch_size)
         sz = self.patch_size//2
         left, right = patch[:sz -2, :sz], patch[:sz -2, sz:]
@@ -210,6 +214,7 @@ class RaymanAgent(Agent):
                 state, reward, episode_over = self.env.step(action)
     
     def action(self, state, curr_action):
+        state.pixels = np.clip(abs(state.pixels - self.env.client.bg_color[0]).sum(axis=2), 0, 1)
         patch = self.extract_patch(state, self.patch_size)
         ray_len = get_ray_lengths(patch, ray_conf=self.ray_conf, 
                                   start_allowance=2, max_len=self.patch_size)
