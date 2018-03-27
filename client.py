@@ -202,6 +202,7 @@ class CurvytronClient(threading.Thread):
             self._send_message(self.BOT_READY)
 
     def send_ready(self):
+        assert (self.player_id is not None)
         msg_id = self._send_message(self.PLAYER_READY)
         self._wait_for_reply(msg_id)
         assert (self.message_responses[msg_id]['success'])
