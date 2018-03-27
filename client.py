@@ -13,6 +13,18 @@ websocket.enableTrace(False)
 __all__ = ['CurvytronClient']
 
 
+def hex_to_rgb(hexstring):
+    '''
+    Assumes a color string of format #ffffff
+    :param hexstring:
+    :return:
+    '''
+    r = int(hexstring[1:3],16)
+    g = int(hexstring[3:5], 16)
+    b = int(hexstring[5:], 16)
+    return (r,g,b)
+
+
 class Game(object):
 
     def __init__(self):
@@ -154,7 +166,8 @@ class CurvytronClient(threading.Thread):
         for player in self.game.players.keys():
             draw_x, draw_y = self.game.players[player].draw_position
             rr, cc = draw.circle(draw_y, draw_x, width / 2, shape=board.shape)
-            board[rr, cc] = 1
+            color = hex_to_rgb(self.game.players[player].color)
+            draw.set_color(board, (rr, cc), color)
 
         return np.clip(board, 0, 1)
 
@@ -286,7 +299,7 @@ class CurvytronClient(threading.Thread):
             self.active_game = True
             self.board_size = int(np.sqrt((80 * 80) + ((len(self.game.players) - 1) * (80 * 80) / 5.0)))
             self.scale = float(self.width) / self.board_size
-            self.trails = np.zeros((self.width, self.width), dtype=np.uint8)
+            self.trails = np.zeros((self.width, self.width, 3), dtype=np.uint8)
             self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
             self._send_message(self.READY)
 
@@ -302,7 +315,7 @@ class CurvytronClient(threading.Thread):
             for k in self.game.players.keys():
                 self.game.players[k].printing = False
             self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
-            self.trails = np.zeros((self.width, self.width), dtype=np.uint8)
+            self.trails = np.zeros((self.width, self.width, 3), dtype=np.uint8)
 
         elif head == "end":  # message received at end of game
             self.active_game = False
@@ -376,7 +389,8 @@ class CurvytronClient(threading.Thread):
         draw_x = (x / 100.0) * self.scale
         draw_y = (y / 100.0) * self.scale
         rr, cc = draw.circle(draw_y, draw_x, width / 2, shape=self.trails.shape)
-        self.trails[rr, cc] = 1
+        color = hex_to_rgb(self.game.players[pid].color)
+        draw.set_color(self.trails, (rr,cc), color)
 
     def _wait_for_reply(self, message_id):
         while message_id not in self.message_responses:
