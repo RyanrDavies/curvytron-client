@@ -50,7 +50,7 @@ class HeuristicAgent(Agent):
 
         if closest_left < closest_right:
             return 2 # Right
-        elif closest_right > closest_left:
+        elif closest_right < closest_left:
             return 0 # Left
         else:
             return 1 # Straight
