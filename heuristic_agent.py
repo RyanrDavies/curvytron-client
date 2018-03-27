@@ -15,6 +15,7 @@ room = 'room_{}'.format(random.randint(0,10000))
 
 DISPLAY_DICT = {0: '.', 1: '#'}
 
+
 class RandomAgent(Agent):
     def __init__(self, name, **kwargs):
         super(RandomAgent, self).__init__(name, serveraddress, room, **kwargs)
@@ -22,13 +23,14 @@ class RandomAgent(Agent):
     def action(self, _):
         return self.env.action_space.sample()
 
+
 class HeuristicAgent(Agent):
     def __init__(self, name, patch_size=50, display=False, **kwargs):
         super(HeuristicAgent, self).__init__(name, serveraddress, room, **kwargs)
         self.patch_size = patch_size
         sz = patch_size//2
         # Precomputed distances
-        self.sq_dist = np.arange(sz) ** 2 + np.arange(sz)[:, np.newaxis] ** 2
+        self.sq_dist = np.arange(sz) ** 2 + np.arange(sz -2)[:, np.newaxis] ** 2
         self.display = display
 
     def action(self, state):
@@ -36,24 +38,27 @@ class HeuristicAgent(Agent):
         assert patch.shape[0] == self.patch_size, "Shape={}".format(patch.shape)
         assert patch.shape[1] == self.patch_size, "Shape={}".format(patch.shape)
         sz = self.patch_size//2
-        left, right = patch[:sz, :sz], patch[:sz, sz:]
+        left, right = patch[:sz -2, :sz], patch[:sz -2, sz:]
         left[0, 0] = right[0, -1] = 1  # hack to handle empty box
         left_dist = self.sq_dist[::-1, ::-1] * left
         right_dist = self.sq_dist[::-1, :] * right
         closest_left = np.min(left_dist[left_dist > 0])
         closest_right = np.min(right_dist[right_dist > 0])
 
-        if self.display:
+        if closest_left < closest_right:
+            choice = 2  # Right
+        elif closest_right < closest_left:
+            choice = 0  # Left
+        else:
+            choice = 1  # Straight
+
+        if self.display:  # and closest_right == closest_left == 1:
             for row in patch:
                 print(''.join([DISPLAY_DICT[i] for i in row]))
-            print("\033[{}A".format(self.patch_size), end='\r')
+            print("left: {} || right: {} || move: {}".format(closest_left,closest_right,choice))
+            print("\033[{}A".format(self.patch_size+1), end='\r')
+        return choice
 
-        if closest_left < closest_right:
-            return 2 # Right
-        elif closest_right < closest_left:
-            return 0 # Left
-        else:
-            return 1 # Straight
 
 if __name__ == '__main__':
     print('server: {} room: room_{}'.format(serveraddress, room))
