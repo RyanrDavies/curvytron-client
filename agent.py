@@ -7,7 +7,7 @@ import threading
 import numpy as np
 from skimage.transform import rotate
 
-from env import CurvytronEnv
+from curvytron import CurvytronEnv
 
 
 class Agent(threading.Thread):

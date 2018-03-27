@@ -7,26 +7,24 @@ import random
 
 from agent import Agent
 
-# serveraddress = "129.215.91.49:8080"
-# serveraddress = "www.curvytron.com:80"
-serveraddress = "127.0.0.1:8080"
 
-room = 'room_{}'.format(random.randint(0,10000))
-
+DEFAULT_ROOM = 'room_{}'.format(random.randint(0,10000))
 DISPLAY_DICT = {0: '.', 1: '#'}
 
 
 class RandomAgent(Agent):
-    def __init__(self, name, **kwargs):
-        super(RandomAgent, self).__init__(name, serveraddress, room, **kwargs)
+    def __init__(self, name, server, room=DEFAULT_ROOM, **kwargs):
+        super(RandomAgent, self).__init__(name, server, room, **kwargs)
 
     def action(self, _):
         return self.env.action_space.sample()
 
 
 class HeuristicAgent(Agent):
-    def __init__(self, name, patch_size=50, display=False, **kwargs):
-        super(HeuristicAgent, self).__init__(name, serveraddress, room, **kwargs)
+    def __init__(self, name, server, room=DEFAULT_ROOM, patch_size=50, 
+                 display=False, **kwargs):
+        super(HeuristicAgent, self).__init__(name, server, room, 
+                                             **kwargs)
         self.patch_size = patch_size
         sz = patch_size//2
         # Precomputed distances
@@ -61,11 +59,17 @@ class HeuristicAgent(Agent):
 
 
 if __name__ == '__main__':
+    serveraddress = '129.215.91.49:8080'  # James' comp
+#    serveraddress = "127.0.0.1:8080"  # Ryan's setting
+#    serveraddress = "curvytron.com"  # Online
+    room = DEFAULT_ROOM
+    
     print('server: {} room: room_{}'.format(serveraddress, room))
 
-    agent = HeuristicAgent('AvidLearner', display=True)
-    opponents = [HeuristicAgent('AngryOpponent1'),
-                 HeuristicAgent('AngryOpponent2')]
+    agent = HeuristicAgent('AvidLearner', server=serveraddress, room=room, 
+                           display=True)
+    opponents = [HeuristicAgent('AngryOpponent1', serveraddress, room),
+                 HeuristicAgent('AngryOpponent2', serveraddress, room)]
 
     agent.start()
     for op in opponents:

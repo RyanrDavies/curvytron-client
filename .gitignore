@@ -1,3 +1,4 @@
+.spyproject/*
 *.zip
 *.pyc
 .idea/*
