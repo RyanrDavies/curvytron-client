@@ -170,7 +170,7 @@ class CurvytronClient(threading.Thread):
             color = hex_to_rgb(self.game.players[player].color)
             draw.set_color(board, (rr, cc), color)
 
-        return np.clip(board, 0, 1)
+        return board
 
     def join(self, timeout=None):
         self.alive.clear()
