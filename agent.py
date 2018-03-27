@@ -35,9 +35,12 @@ class Agent(threading.Thread):
 
         angle = math.degrees(state.angle) + 90 # This is clockwise angle from 12 o'clock
         pixels = state.pixels
-        expanded = np.ones([pixels.shape[0] + s, pixels.shape[1] + s])
-        expanded[sz:-sz, sz:-sz] = pixels
+        expanded = np.ones([pixels.shape[0] + s+2, pixels.shape[1] + s+2])
+        assert expanded.shape[0] == expanded.shape[1], "Expanded Shape={}".format(expanded.shape)
+        expanded[(sz+1):-(sz+1), (sz+1):-(sz+1)] = pixels
         clipped = expanded[(x - sz):(x + sz), (y - sz):(y + sz)]
+        assert ((x+sz)-(x-sz)) == ((y+sz)-(y-sz))
+        assert clipped.shape[0] == clipped.shape[1], "Clipped Shape={}".format(clipped.shape)
         # rotate expects angle to be anti-clockwise from 12
         rot = rotate(clipped, angle=angle)
 
