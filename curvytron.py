@@ -38,7 +38,7 @@ class CurvytronEnv(gym.Env):
     def step(self, a):
         reward = -10.0
         action = self.action_set[a]
-        observation = self.client.get_canvas()  # Or whatever the correct method is.
+#        observation = self.client.get_canvas()  # Or whatever the correct method is.
         done = not(self.client.player_alive and self.client.active_round)
         if not done:
             self.client.send_action(action)
