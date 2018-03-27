@@ -29,12 +29,14 @@ class Server(object):
 
 class Player(object):
 
-    def __init__(self, name, color, angle=None, printing=False, updated=False):
+    def __init__(self, name, color, angle=None, printing=False, updated=False, position=None, draw_position=None):
         self.name = name
         self.color = color
         self.printing = printing
         self.updated = updated
         self.angle = angle
+        self.position = position
+        self.draw_position = draw_position
 
     def set_property(self, property, value):
         return setattr(self, property, value)
@@ -146,7 +148,15 @@ class CurvytronClient(threading.Thread):
                 self.game.players[player].updated = False
             frames += 1
             self._send_message(self.BOT_READY)
-        return np.clip(self.trails, 0, 1)
+
+        board = self.trails.copy()
+        width = np.ceil(1.2 * self.scale)
+        for player in self.game.players.keys():
+            draw_x, draw_y = self.game.players[player].draw_position
+            rr, cc = draw.circle(draw_y, draw_x, width / 2, shape=board.shape)
+            board[rr, cc] = 1
+
+        return np.clip(board, 0, 1)
 
     def join(self, timeout=None):
         self.alive.clear()
@@ -352,16 +362,13 @@ class CurvytronClient(threading.Thread):
 
     def _update_position(self, message):
         pid, x, y = message
-        width = np.ceil(1.2 * self.scale)
         draw_x = (x / 100.0) * self.scale
         draw_y = (y / 100.0) * self.scale
 
         if pid == self.player_id:
             self.position = (draw_y, draw_x)
-
-        rr, cc = draw.circle(draw_y, draw_x, width / 2, shape=self.heads.shape)
-        self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
-        self.heads[rr, cc] = 1
+        self.game.players[pid].position=(x,y)
+        self.game.players[pid].draw_position = (draw_x,draw_y)
 
     def _update_trails(self, message):
         pid, x, y = message
