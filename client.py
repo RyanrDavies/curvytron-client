@@ -120,7 +120,6 @@ class CurvytronClient(threading.Thread):
 
         self.board_size = 0
         self.trails = None
-        self.heads = None
         self.width = width
         self.scale = 1
         self.position = None
@@ -301,7 +300,6 @@ class CurvytronClient(threading.Thread):
             self.board_size = int(np.sqrt((80 * 80) + ((len(self.game.players) - 1) * (80 * 80) / 5.0)))
             self.scale = float(self.width) / self.board_size
             self.trails = np.ones((self.width, self.width, 3), dtype=np.uint8) * 34  # set bg color
-            self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
             self._send_message(self.READY)
 
         elif head == "game:stop":  # message received at end of round
@@ -315,7 +313,6 @@ class CurvytronClient(threading.Thread):
             self.player_alive = True
             for k in self.game.players.keys():
                 self.game.players[k].printing = False
-            self.heads = np.zeros((self.width, self.width), dtype=np.uint8)
             self.trails = np.ones((self.width, self.width, 3), dtype=np.uint8) * 34  # set bg color
 
         elif head == "end":  # message received at end of game
