@@ -251,7 +251,7 @@ if __name__ == '__main__':
 #    serveraddress = "curvytron.com"  # Online
     room = DEFAULT_ROOM
     
-    print('server: {} room: room_{}'.format(serveraddress, room))
+    print('server: {} room: {}'.format(serveraddress, room))
 
     agent = RaymanAgent('Rayman', serveraddress, room, display=True)
 #    agent = RaymanAgent('RaymanAgent', server=serveraddress, room=room, 
