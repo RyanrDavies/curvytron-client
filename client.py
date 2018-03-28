@@ -332,6 +332,9 @@ class CurvytronClient(threading.Thread):
         elif head == 'room:open':
             self.server.rooms.append(body)
 
+        elif head == 'room:leave':
+            _ = self.game.players.pop(body['player'])
+
         elif isinstance(head, int):
             self.message_responses[head] = body
 
