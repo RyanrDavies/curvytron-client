@@ -36,6 +36,27 @@ class CurvytronEnv(gym.Env):
         self.action_set = {0:-1,1:0,2:1}
 
     def step(self, a):
+        """
+        Submits an action to the curvytron server and returns the state
+        
+        Parameters
+        ----------
+        
+        a : int in [0, 1, 2]
+            action to submit (left, straight, right)
+        
+        Returns
+        -------
+        
+        state : tuple (canvas, position, angle)
+            canvas (200 x 200 x 3 colour image)
+            position (2D coordinate (x0, x1))
+            angle (clockwise radians from 3 o'clock)
+        reward : float
+            0 if not done, -10 when episode ends
+        done: boolean
+            False until episode ends
+        """
         reward = -10.0
         action = self.action_set[a]
 #        observation = self.client.get_canvas()  # Or whatever the correct method is.
