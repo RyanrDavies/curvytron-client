@@ -1,14 +1,11 @@
 from __future__ import absolute_import, division, print_function
-
 import time
 import numpy as np
-
 import random
-
 from agent import Agent
+import argparse
 
 __all__ = ['RandomAgent', 'HeuristicAgent1', 'HeuristicAgent2', 'RaymanAgent']
-
 
 DEFAULT_ROOM = 'room_{}'.format(random.randint(0,10000))
 DISPLAY_DICT = {0: '.', 1: '#'}
@@ -246,10 +243,18 @@ class RaymanAgent(Agent):
 
 
 if __name__ == '__main__':
-    serveraddress = '129.215.91.49:8080'  # James' comp
-#    serveraddress = "127.0.0.1:8080"  # Ryan's setting
-#    serveraddress = "curvytron.com"  # Online
-    room = DEFAULT_ROOM
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--serveraddress', 
+                        help="The address of the server to connect to",
+                        default='129.215.91.49:8080')
+    parser.add_argument('-r', '--room', 
+                        help="The name of the room to join",
+                        default=DEFAULT_ROOM)
+    args = parser.parse_args()
+    serveraddress = args.serveraddress  # James' comp
+#    serveraddress = "127.0.0.1:8080"  # Ryan's
+#    serveraddress = "curvytron.com:80"  # Online
+    room = args.room
     
     print('server: {} room: {}'.format(serveraddress, room))
 
