@@ -15,12 +15,13 @@ pip install websocket-client
 ```
 
 ***
-To see the environment drawing the players, run the following in a python script, replacing "server_address" with the actual address of your curvytron server (e.g. 127.0.0.1:8080):
+To see the environment drawing the players, run the following in a python script, replacing "server_address" with the actual address of your curvytron server (e.g. 127.0.0.1:8080) (or use "www.curvytron.com" to run on the website):
 
 ```python
 import curvytron
 import matplotlib.pyplot as plt
-serveraddress = "127.0.0.1:8080"
+serveraddress = "127.0.0.1:8080"  # if you're running a local server
+# serveraddress = "www.curvytron.com"  # if you want to run on the game website
 env = curvytron.CurvytronEnv(server=serveraddress,room='room')
 env.reset()
 episode_over = False
