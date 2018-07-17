@@ -49,6 +49,7 @@ class Player(object):
         self.angle = angle
         self.position = position
         self.draw_position = draw_position
+        self.alive=True
 
     def set_property(self, property, value):
         return setattr(self, property, value)
@@ -85,7 +86,8 @@ class CurvytronClient(threading.Thread):
     READY = '[["ready"]]'
     PLAYER_READY = '[["room:ready", {{"player": {player_id}}}, {msg_id}]]'
     BONUS_CHANGE_ROOM = '[["room:config:bonus",{{"bonus":"{bonus_name}","enabled":{enabled}}}, {msg_id}]]'
-    BOT_READY = '[["BOT:READY"]]'
+    BOT_READY = '[["bot:ready"]]'
+    MAX_SCORE = '[["room:config:max-score",{{"maxScore":{score}}},{msg_id}]]'
 
     def __init__(self, name='pythonClient', color="#ffffff", width=200, verbose=False, n_frames=3, stepped=False):
         super(CurvytronClient, self).__init__()
@@ -152,14 +154,15 @@ class CurvytronClient(threading.Thread):
         assert (self.message_responses[self.message_id]['success'])
 
     def get_canvas(self):
-        frames = 0
-        while frames < self.n_frames:
-            while not all([self.game.players[player].updated for player in self.game.players.keys()]):
-                continue
-            for player in self.game.players.keys():
-                self.game.players[player].updated = False
-            frames += 1
-            self._send_message(self.BOT_READY)
+        if self.stepped:
+            frames = 0
+            while frames < self.n_frames:
+                while not all([self.game.players[player].updated for player in self.game.players.keys() if self.game.players[player].alive]):
+                    continue
+                for player in self.game.players.keys():
+                    self.game.players[player].updated = False
+                frames += 1
+                self._send_message(self.BOT_READY)
 
         board = self.trails.copy()
         width = np.ceil(1.2 * self.scale)
@@ -176,7 +179,7 @@ class CurvytronClient(threading.Thread):
         self.ws.close()
         super(CurvytronClient, self).join(timeout)
 
-    def join_room(self, target_room, on_bonuses=None):
+    def join_room(self, target_room, on_bonuses=None, max_score=3):
         """Doc string
         If the provided room exists, join it.
         Otherwise, create and configure the room,
@@ -201,9 +204,10 @@ class CurvytronClient(threading.Thread):
 
         msg_id = self._send_message(self.ADD_PLAYER)
         self._wait_for_reply(msg_id)
-        assert (self.message_responses[msg_id]['success'])
+        assert (self.message_responses[msg_id]['success']), self.message_responses[msg_id]
         if not joined_existing:
             self.set_bonuses(on_bonuses=on_bonuses)
+            self.set_max_score(max_score=max_score)
 
     def run(self):
         self.ws.settimeout(0.05)
@@ -216,6 +220,7 @@ class CurvytronClient(threading.Thread):
 
                 if recvd:
                     self._process_recvd(recvd)
+
 
     def send_action(self, action):
         if not self.last_action == action:
@@ -252,6 +257,9 @@ class CurvytronClient(threading.Thread):
                                    {'bonus_name': bonus_name,
                                     'enabled': 'false'})
 
+    def set_max_score(self, max_score=3):
+        self._send_message(self.MAX_SCORE,{'score':max_score})
+
     def _add_players(self, players):
         for player in players:
             self.game.players[player['id']] = Player(**{'name': player['name'],
@@ -287,12 +295,15 @@ class CurvytronClient(threading.Thread):
         elif head == 'die':
             if body[0] == self.player_id:
                 self.player_alive = False
+            self.game.players[body[0]].alive = False
 
         elif head == 'score:round':
             if body[0] == self.player_id:
                 self.round_score = body[1]
 
         elif head == "game:start":  # message received at start of subsequent rounds
+            for player in self.game.players.keys():
+                self.game.players[player].alive = True
             self.active_round = True
 
         elif head == "room:game:start":  # message received at start of game
